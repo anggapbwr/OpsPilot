@@ -1,0 +1,60 @@
+# OpsPilot Remediation Policy Configuration
+# Defines deterministic authorization and constraints for remediation actions.
+# Default-deny is enforced: Any action not explicitly listed with allowed=true is DENIED.
+
+policies:
+  restart_container:
+    risk: low
+    auto_execute: true
+    requires_approval: false
+    max_attempts: 3
+    blocked: false
+    description: "Safely restart the target container instance via Ansible."
+
+  restart_service:
+    risk: low
+    auto_execute: true
+    requires_approval: false
+    max_attempts: 3
+    blocked: false
+    description: "Restart the application service inside the target environment."
+
+  rollback_deployment:
+    risk: medium
+    auto_execute: false
+    requires_approval: true
+    max_attempts: 1
+    blocked: false
+    description: "Rollback the target container/deployment to the previous known stable version."
+
+  no_action:
+    risk: low
+    auto_execute: false
+    requires_approval: false
+    max_attempts: 0
+    blocked: false
+    description: "No automated or manual action is taken; keep under monitoring."
+
+  escalate:
+    risk: high
+    auto_execute: false
+    requires_approval: false
+    max_attempts: 0
+    blocked: false
+    description: "Escalate incident to human engineering team with collected diagnostic evidence."
+
+  modify_firewall:
+    risk: high
+    auto_execute: false
+    requires_approval: true
+    max_attempts: 1
+    blocked: false
+    description: "Modifications to network/firewall rules require explicit human approval."
+
+  delete_resource:
+    risk: critical
+    auto_execute: false
+    requires_approval: true
+    blocked: true
+    max_attempts: 0
+    description: "Destructive resource deletion is strictly prohibited by policy."

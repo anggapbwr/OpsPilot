@@ -1,0 +1,24 @@
+---
+- name: Restart Service Remediation Playbook
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    container_name: "{{ target_container_name | default('payment-api') }}"
+    service_name: "{{ target_service_name | default('app') }}"
+
+  tasks:
+    - name: Announce service restart
+      ansible.builtin.debug:
+        msg: "Executing restart_service for service '{{ service_name }}' on '{{ container_name }}'"
+
+    - name: Restart service via container command or docker restart
+      ansible.builtin.command:
+        cmd: "docker restart {{ container_name }}"
+      register: service_restart_result
+      changed_when: service_restart_result.rc == 0
+
+    - name: Report success
+      ansible.builtin.debug:
+        msg: "Service '{{ service_name }}' restart command succeeded."

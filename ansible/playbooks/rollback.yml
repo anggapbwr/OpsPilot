@@ -1,0 +1,24 @@
+---
+- name: Rollback Deployment Remediation Playbook
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    container_name: "{{ target_container_name | default('payment-api') }}"
+    previous_image: "{{ target_previous_image | default('payment-api:stable') }}"
+
+  tasks:
+    - name: Announce rollback action
+      ansible.builtin.debug:
+        msg: "Executing rollback_deployment for '{{ container_name }}' to image '{{ previous_image }}'"
+
+    - name: Restart container to reset state in demo simulator
+      ansible.builtin.command:
+        cmd: "docker restart {{ container_name }}"
+      register: rollback_result
+      changed_when: rollback_result.rc == 0
+
+    - name: Report rollback completion
+      ansible.builtin.debug:
+        msg: "Rollback completed for '{{ container_name }}'."

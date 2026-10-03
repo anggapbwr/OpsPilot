@@ -1,0 +1,25 @@
+---
+- name: Verify Service Health Playbook
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    health_url: "{{ target_service_url | default('http://payment-api:8080') }}/health"
+    expected_status: 200
+
+  tasks:
+    - name: Check target HTTP health endpoint
+      ansible.builtin.uri:
+        url: "{{ health_url }}"
+        method: GET
+        status_code: "{{ expected_status }}"
+        timeout: 5
+      register: health_check
+      until: health_check.status == expected_status
+      retries: 3
+      delay: 2
+
+    - name: Announce health check pass
+      ansible.builtin.debug:
+        msg: "Service verification PASSED: HTTP {{ health_check.status }} received from {{ health_url }}"

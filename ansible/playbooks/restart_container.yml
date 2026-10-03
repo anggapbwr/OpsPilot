@@ -1,0 +1,35 @@
+---
+- name: Restart Docker Container Remediation Playbook
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    container_name: "{{ target_container_name | default('payment-api') }}"
+    wait_time_seconds: 3
+
+  tasks:
+    - name: Announce remediation action
+      ansible.builtin.debug:
+        msg: "Executing safe remediation: restarting container '{{ container_name }}'"
+
+    - name: Restart container using community.docker or command fallback
+      block:
+        - name: Restart container via docker CLI command
+          ansible.builtin.command:
+            cmd: "docker restart {{ container_name }}"
+          register: restart_result
+          changed_when: restart_result.rc == 0
+
+        - name: Wait for container to initialize
+          ansible.builtin.pause:
+            seconds: "{{ wait_time_seconds }}"
+
+        - name: Remediation status
+          ansible.builtin.debug:
+            msg: "Successfully restarted container '{{ container_name }}' (stdout: {{ restart_result.stdout }})"
+
+      rescue:
+        - name: Log restart failure
+          ansible.builtin.fail:
+            msg: "Failed to restart container '{{ container_name }}'. Reason: {{ ansible_failed_result.msg | default('Unknown execution error') }}"
