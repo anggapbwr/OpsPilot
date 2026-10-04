@@ -9,7 +9,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
 [![Ansible](https://img.shields.io/badge/Ansible-Automation-EE0000.svg)](https://www.ansible.com/)
 [![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-E6522C.svg)](https://prometheus.io/)
-[![Tests](https://img.shields.io/badge/Tests-35%2F35%20Passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-Passing-brightgreen.svg)](tests/)
 [![Code Style: Ruff](https://img.shields.io/badge/Code%20Style-Ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -152,7 +152,8 @@ stateDiagram-v2
 
 OpsPilot includes a modern, light-theme operations dashboard available at **`http://localhost:8000/dashboard`**.
 
-![Dashboard](https://raw.githubusercontent.com/opspilot/opspilot/main/docs/dashboard-preview.png)
+> Dashboard preview image is not bundled in this repository.  
+> Open `http://localhost:8000/dashboard` after startup to see the live UI.
 
 ### Key Features
 1. **Live System Health Chips:** Real-time visual status monitoring of the target microservice (`payment-api`) and local AI provider (`Ollama`).
@@ -223,8 +224,13 @@ OpsPilot/
 │   └── prometheus.yml              # Prometheus scrape configuration
 ├── scripts/
 │   ├── demo.ps1                    # End-to-end verification suite (PowerShell)
-│   └── demo.sh                     # End-to-end verification suite (Bash)
-├── tests/                          # 100% passing test suite (35 tests)
+│   ├── demo.sh                     # End-to-end verification suite (Bash)
+│   ├── reset_demo.ps1              # Reset target service state (PowerShell)
+│   ├── reset_demo.sh               # Reset target service state (Bash)
+│   ├── health_check.ps1            # Health check helper (PowerShell)
+│   ├── health_check.sh             # Health check helper (Bash)
+│   └── start.sh                    # Local startup helper
+├── tests/                          # Unit and integration test suite
 │   ├── integration/                # End-to-end pipeline and extended scenario tests
 │   └── unit/                       # Component-level tests (Policy, Diagnosis, etc.)
 ├── docker-compose.yml              # Multi-container orchestration stack
@@ -390,9 +396,12 @@ Comprehensive OpenAPI documentation is available interactively at `/docs`.
 
 ## 14. Testing & Code Quality
 
-OpsPilot maintains a **100% pass rate across 35 unit and integration tests**:
+OpsPilot includes unit and integration tests for the core incident lifecycle:
 
 ```bash
+# Install development dependencies (if pytest/ruff are not installed yet)
+pip install -e ".[dev]"
+
 # Run complete test suite
 pytest tests/ -v
 
