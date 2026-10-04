@@ -9,11 +9,22 @@ from pydantic import BaseModel, Field
 from app.audit.logger import AuditLogger
 from app.dependencies import get_audit_logger, get_orchestrator
 from app.detection.detector import generate_incident_id
+from app.diagnosis.fallback import FallbackDiagnoser
+from app.models.diagnosis import DiagnosisResult, DiagnosisSource
 from app.models.incident import Incident, IncidentSeverity, IncidentState, IncidentType
 from app.models.remediation import ApprovalRecord
 from app.orchestrator import IncidentOrchestrator
 
 router = APIRouter(prefix="/api/v1/incidents", tags=["Incidents"])
+
+
+class DiagnoseRequest(BaseModel):
+    """Optional diagnosis options."""
+
+    force_fallback: bool = Field(default=False, description="Force deterministic fallback diagnosis")
+    mock_action: Optional[str] = Field(
+        default=None, description="Simulate specific diagnostic action for safety validation"
+    )
 
 
 class CreateIncidentRequest(BaseModel):
@@ -87,6 +98,7 @@ def get_incident(
 @router.post("/{incident_id}/diagnose", summary="Trigger diagnosis")
 async def diagnose_incident(
     incident_id: str,
+    req: DiagnoseRequest = DiagnoseRequest(),
     orchestrator: IncidentOrchestrator = Depends(get_orchestrator),
 ) -> Dict[str, Any]:
     """Run evidence collection and AI/fallback diagnosis for an incident."""
@@ -109,11 +121,26 @@ async def diagnose_incident(
         )
         incident.evidence = evidence
 
-    # Run diagnosis
-    diagnosis = await orchestrator.diagnosis_engine.diagnose(
-        incident=incident,
-        evidence=incident.evidence or {},
-    )
+    # Run diagnosis (mock scenario, force fallback, or live AI)
+    if req.mock_action:
+        diagnosis = DiagnosisResult(
+            root_cause="simulated_diagnostic_scenario",
+            confidence=0.95,
+            recommended_action=req.mock_action,
+            reasoning_summary=f"Simulated recommendation for testing action '{req.mock_action}'.",
+            source=DiagnosisSource.ollama,
+        )
+    elif req.force_fallback:
+        diagnosis = FallbackDiagnoser.diagnose(
+            incident=incident,
+            evidence=incident.evidence or {},
+        )
+    else:
+        diagnosis = await orchestrator.diagnosis_engine.diagnose(
+            incident=incident,
+            evidence=incident.evidence or {},
+        )
+
     incident.diagnosis = diagnosis
     if incident.status == IncidentState.investigating:
         incident.transition_to(IncidentState.diagnosed)
@@ -157,6 +184,48 @@ def approve_incident(
         "status": incident.status.value,
         "approval": incident.approval.model_dump(),
         "message": f"Remediation action approved by {req.approved_by}.",
+    }
+
+
+@router.post("/{incident_id}/reject", summary="Reject remediation action")
+def reject_incident(
+    incident_id: str,
+    req: ApprovalRequest,
+    orchestrator: IncidentOrchestrator = Depends(get_orchestrator),
+) -> Dict[str, Any]:
+    """Reject a high-risk remediation action, escalating the incident to human on-call."""
+    incident = orchestrator.get_incident(incident_id)
+    if not incident:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Incident '{incident_id}' not found.",
+        )
+
+    if incident.status != IncidentState.awaiting_approval:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Incident is not awaiting approval (current status: '{incident.status.value}').",
+        )
+
+    incident.approval = ApprovalRecord(
+        approved=False,
+        approved_by=req.approved_by,
+        approved_at=datetime.now(timezone.utc),
+        note=req.note,
+    )
+    incident.transition_to(IncidentState.escalated, reason=f"Remediation rejected by {req.approved_by}: {req.note}")
+    orchestrator.audit_logger.record_from_incident(
+        incident=incident,
+        execution_status="denied",
+        verification_status="not_executed",
+        notes=f"Remediation action rejected by operator {req.approved_by}: {req.note or 'No justification provided'}",
+    )
+
+    return {
+        "incident_id": incident.id,
+        "status": incident.status.value,
+        "approval": incident.approval.model_dump(),
+        "message": f"Remediation action rejected by {req.approved_by}. Incident escalated.",
     }
 
 

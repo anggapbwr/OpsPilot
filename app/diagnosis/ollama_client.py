@@ -20,14 +20,20 @@ CRITICAL INSTRUCTIONS:
 1. You MUST respond with ONLY a valid, parseable JSON object matching the schema below.
 2. The field 'recommended_action' MUST BE EXACTLY ONE of the following authorized actions:
    {allowed_actions}
-3. Any other action (such as delete_database, rm_rf, execute_shell, modify_firewall) is STRICTLY PROHIBITED and will cause immediate system rejection.
-4. 'confidence' must be a float between 0.0 and 1.0.
+3. Action Selection Rules:
+   - If incident_type is 'failed_deployment' or evidence indicates deployment/release error (e.g. HTTP 503, schema migration failure, broken release version): you MUST recommend 'rollback_deployment'.
+   - If incident_type is 'container_unhealthy' or HTTP 500 internal error or process crash: recommend 'restart_container'.
+   - If incident_type is 'service_unavailable' or connection is refused: recommend 'restart_service'.
+   - If health check timed out: recommend 'restart_container'.
+   - If unrecoverable or uncertain: recommend 'escalate'.
+4. Any other action (such as delete_database, rm_rf, execute_shell, modify_firewall) is STRICTLY PROHIBITED.
+5. 'confidence' must be a float between 0.0 and 1.0.
 
 JSON SCHEMA:
 {{
   "root_cause": "string describing the root cause",
   "confidence": 0.85,
-  "recommended_action": "restart_container",
+  "recommended_action": "rollback_deployment",
   "reasoning_summary": "concise explanation of findings"
 }}
 
@@ -50,11 +56,26 @@ class OllamaClient:
         base_url: Optional[str] = None,
         model: Optional[str] = None,
         timeout: Optional[float] = None,
+        connect_timeout: Optional[float] = None,
     ):
         settings = get_settings()
         self.base_url = (base_url or settings.ollama_base_url).rstrip("/")
         self.model = model or settings.ollama_model
         self.timeout = timeout or settings.ollama_timeout_seconds
+        self.connect_timeout = connect_timeout or settings.ollama_connect_timeout_seconds
+
+    async def is_ready(self) -> bool:
+        """Check whether Ollama endpoint is online and target model is present."""
+        try:
+            client_timeout = httpx.Timeout(timeout=self.connect_timeout, connect=self.connect_timeout)
+            async with httpx.AsyncClient(timeout=client_timeout) as client:
+                res = await client.get(f"{self.base_url}/api/tags")
+                if res.status_code == 200:
+                    models = [m.get("name", "") for m in res.json().get("models", [])]
+                    return any(self.model in m for m in models)
+        except Exception:
+            return False
+        return False
 
     async def diagnose_incident(
         self,
@@ -86,8 +107,10 @@ class OllamaClient:
 
         logger.info(f"Sending diagnostic prompt to Ollama at {url} (model: {self.model})...")
 
+        client_timeout = httpx.Timeout(timeout=self.timeout, connect=self.connect_timeout)
+
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=client_timeout) as client:
                 response = await client.post(url, json=payload)
                 response.raise_for_status()
                 res_data = response.json()

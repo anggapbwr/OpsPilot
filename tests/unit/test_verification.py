@@ -90,3 +90,24 @@ async def test_verification_failure_escalates_when_max_attempts_reached(sample_i
     assert result["passed"] is False
     assert sample_incident.status == IncidentState.escalated
     assert sample_incident.remediation_history[-1].verification_status == VerificationStatus.failed
+
+
+@pytest.mark.asyncio
+async def test_verification_distinguishes_failed_remediation_with_independent_recovery(sample_incident: Incident):
+    """When remediation execution failed but target independently recovered, outcome must reflect this."""
+    sample_incident.remediation_history[-1].status = RemediationStatus.failure
+    mock_health = AsyncMock(spec=HealthChecker)
+    mock_health.check_http_health.return_value = {
+        "healthy": True,
+        "status_code": 200,
+        "latency_ms": 12.0,
+    }
+
+    verifier = Verifier(health_checker=mock_health, delay_seconds=0.0)
+    result = await verifier.verify(sample_incident)
+
+    assert result["passed"] is True
+    assert result["remediation_succeeded"] is False
+    assert result["outcome"] == "REMEDIATION_FAILED_BUT_RECOVERED_INDEPENDENTLY"
+    assert sample_incident.status == IncidentState.resolved
+    assert "recovered independently" in result["message"].lower()

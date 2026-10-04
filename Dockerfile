@@ -9,7 +9,7 @@ WORKDIR /app
 # Install system dependencies: curl for health checks, docker CLI for container operations
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    docker.io \
+    docker-cli \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency definition and install

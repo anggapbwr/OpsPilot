@@ -41,11 +41,19 @@ class Detector:
 
         # Determine incident type and severity
         error_msg = health.get("error") or ""
+        payload_str = str(health.get("payload", "")).lower()
+
         if "Connection refused" in error_msg:
             inc_type = IncidentType.service_unavailable
             severity = IncidentSeverity.high
+        elif health.get("status_code") == 503 or "deployment" in payload_str or "err_deployment_failed" in payload_str:
+            inc_type = IncidentType.failed_deployment
+            severity = IncidentSeverity.high
         elif health.get("status_code") == 500:
             inc_type = IncidentType.container_unhealthy
+            severity = IncidentSeverity.medium
+        elif "timed out" in error_msg.lower():
+            inc_type = IncidentType.failed_health_check
             severity = IncidentSeverity.medium
         else:
             inc_type = IncidentType.failed_health_check

@@ -105,6 +105,8 @@ class Incident(BaseModel):
 
     def transition_to(self, new_state: IncidentState, reason: str = "") -> None:
         """Safely transition incident to a new state or raise InvalidStateTransitionError."""
+        if self.status == new_state:
+            return
         allowed = VALID_TRANSITIONS.get(self.status, [])
         if new_state not in allowed:
             raise InvalidStateTransitionError(

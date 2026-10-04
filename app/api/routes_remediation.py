@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import PolicyDeniedError
+from app.core.metrics import kpi_tracker
 from app.dependencies import get_orchestrator
 from app.orchestrator import IncidentOrchestrator
 
@@ -47,10 +48,11 @@ async def remediate_incident(
             "attempt": attempt.model_dump(),
         }
     except PolicyDeniedError as e:
+        kpi_tracker.record_policy_block()
         orchestrator.audit_logger.record_from_incident(
             incident=incident,
-            execution_status="denied",
-            verification_status="failed",
+            execution_status="not_executed",
+            verification_status="not_executed",
             notes=f"Policy denied execution: {e.reason}",
         )
         raise HTTPException(
@@ -78,9 +80,10 @@ async def verify_incident(
 
     result = await orchestrator.verifier.verify(incident=incident)
     verif_status = "passed" if result.get("passed") else "failed"
+    remediation_ok = result.get("remediation_succeeded", False)
     orchestrator.audit_logger.record_from_incident(
         incident=incident,
-        execution_status="success" if result.get("passed") else "failed",
+        execution_status="success" if remediation_ok else "failed",
         verification_status=verif_status,
         notes=result.get("message") or result.get("error"),
     )
@@ -151,3 +154,72 @@ async def trigger_demo_failure(
             f"remediated via policy-approved Ansible playbook, and final state is '{resolved_incident.status.value}'."
         ),
     )
+
+
+# --- SIMULATOR PROXY ENDPOINTS FOR WEB DASHBOARD ---
+
+
+@router.post("/api/v1/simulator/unhealthy", summary="Inject failure into target service")
+async def simulator_unhealthy(settings: Settings = Depends(get_settings)) -> Dict[str, Any]:
+    url = f"{settings.target_service_url.rstrip('/')}/fault/unhealthy"
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            res = await client.post(url)
+            return res.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Target unreachable: {e}")
+
+
+@router.post("/api/v1/simulator/recover", summary="Recover target service to healthy")
+async def simulator_recover(settings: Settings = Depends(get_settings)) -> Dict[str, Any]:
+    url = f"{settings.target_service_url.rstrip('/')}/fault/recover"
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            res = await client.post(url)
+            return res.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Target unreachable: {e}")
+
+
+@router.get("/api/v1/simulator/health", summary="Check target service health")
+async def simulator_health(settings: Settings = Depends(get_settings)) -> Dict[str, Any]:
+    url = f"{settings.target_service_url.rstrip('/')}/health"
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            res = await client.get(url)
+            return {"status_code": res.status_code, "data": res.json()}
+    except Exception as e:
+        return {"status_code": 0, "error": str(e), "data": {"status": "unreachable"}}
+
+
+@router.post("/api/v1/simulator/deployment-failed", summary="Inject bad deployment v2.0.0")
+async def simulator_deployment_failed(settings: Settings = Depends(get_settings)) -> Dict[str, Any]:
+    url = f"{settings.target_service_url.rstrip('/')}/fault/deployment-failed"
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            res = await client.post(url)
+            return res.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Target unreachable: {e}")
+
+
+@router.post("/api/v1/simulator/latency", summary="Inject latency delay into target service")
+async def simulator_latency(seconds: float = 5.0, settings: Settings = Depends(get_settings)) -> Dict[str, Any]:
+    url = f"{settings.target_service_url.rstrip('/')}/fault/latency?seconds={seconds}"
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            res = await client.post(url)
+            return res.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Target unreachable: {e}")
+
+
+@router.post("/api/v1/simulator/rollback", summary="Rollback target service to v1.0.0")
+async def simulator_rollback(settings: Settings = Depends(get_settings)) -> Dict[str, Any]:
+    url = f"{settings.target_service_url.rstrip('/')}/fault/rollback"
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            res = await client.post(url)
+            return res.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Target unreachable: {e}")

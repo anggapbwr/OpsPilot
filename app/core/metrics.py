@@ -70,12 +70,16 @@ class OperationalMetricsTracker:
         self.successful_remediations: int = 0
         self.total_incidents: int = 0
         self.manual_intervention_count: int = 0
+        self.policy_blocks: int = 0
 
     def record_incident_created(self) -> None:
         self.total_incidents += 1
 
     def record_manual_intervention(self) -> None:
         self.manual_intervention_count += 1
+
+    def record_policy_block(self) -> None:
+        self.policy_blocks += 1
 
     def record_remediation_result(self, success: bool, duration_seconds: float) -> None:
         self.total_remediation_attempts += 1
@@ -93,11 +97,11 @@ class OperationalMetricsTracker:
             else 0.0
         )
 
-        # 2. Remediation Success Rate
+        # 2. Remediation Success Rate (None if no attempts executed yet)
         success_rate = (
             round((self.successful_remediations / self.total_remediation_attempts) * 100, 2)
             if self.total_remediation_attempts > 0
-            else 100.0
+            else None
         )
 
         # 3. Manual Intervention Rate
@@ -109,11 +113,13 @@ class OperationalMetricsTracker:
 
         return {
             "mttr_seconds": mttr,
+            "success_rate": success_rate,
             "remediation_success_rate_percent": success_rate,
             "manual_intervention_rate_percent": intervention_rate,
             "total_incidents": self.total_incidents,
             "total_remediation_attempts": self.total_remediation_attempts,
             "successful_remediations": self.successful_remediations,
+            "policy_blocks": self.policy_blocks,
             "manual_interventions": self.manual_intervention_count,
         }
 

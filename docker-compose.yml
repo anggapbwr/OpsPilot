@@ -14,7 +14,8 @@ services:
       - PORT=8000
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_MODEL=llama3.2
-      - OLLAMA_TIMEOUT_SECONDS=10.0
+      - OLLAMA_TIMEOUT_SECONDS=45.0
+      - OLLAMA_CONNECT_TIMEOUT_SECONDS=5.0
       - TARGET_SERVICE_NAME=payment-api
       - TARGET_SERVICE_URL=http://payment-api:8080
       - TARGET_CONTAINER_NAME=payment-api
@@ -24,6 +25,7 @@ services:
       - AUDIT_LOG_FILE=/app/logs/audit.log
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./app:/app/app
       - ./logs:/app/logs
     depends_on:
       payment-api:

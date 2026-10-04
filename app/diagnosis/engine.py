@@ -40,7 +40,7 @@ class DiagnosisEngine:
                 confidence=ai_output.confidence,
                 recommended_action=ai_output.recommended_action,
                 reasoning_summary=ai_output.reasoning_summary,
-                source=DiagnosisSource.ai,
+                source=DiagnosisSource.ollama,
             )
         except DiagnosisValidationError as e:
             logger.warning(

@@ -140,10 +140,11 @@ class IncidentOrchestrator:
             # Blocked action handling
             if decision.blocked:
                 incident.transition_to(IncidentState.blocked, reason=decision.reason or "Blocked by policy")
+                kpi_tracker.record_policy_block()
                 self.audit_logger.record_from_incident(
                     incident=incident,
-                    execution_status="blocked",
-                    verification_status="failed",
+                    execution_status="not_executed",
+                    verification_status="not_executed",
                     notes=f"Prohibited action '{rec_action}' strictly blocked by policy.",
                 )
                 INCIDENTS_ESCALATED_TOTAL.labels(target=incident.target, reason="policy_blocked").inc()
@@ -173,6 +174,7 @@ class IncidentOrchestrator:
                 try:
                     attempt = await self.remediation_executor.execute(incident=incident)
                 except PolicyDeniedError as e:
+                    kpi_tracker.record_policy_block()
                     self.audit_logger.record_from_incident(
                         incident=incident,
                         execution_status="denied",
@@ -192,8 +194,24 @@ class IncidentOrchestrator:
                 else:
                     REMEDIATION_FAILURE_TOTAL.labels(action=attempt.action, target=incident.target).inc()
 
-                # If execution failed or skipped
+                # If execution failed, resolved, or blocked
                 if incident.status in {IncidentState.resolved, IncidentState.escalated, IncidentState.blocked}:
+                    if incident.status == IncidentState.escalated:
+                        kpi_tracker.record_remediation_result(success=False, duration_seconds=0.0)
+                        kpi_tracker.record_manual_intervention()
+                        INCIDENTS_ESCALATED_TOTAL.labels(
+                            target=incident.target, reason="remediation_execution_failed"
+                        ).inc()
+                        ACTIVE_INCIDENTS.dec()
+                        self.audit_logger.record_from_incident(
+                            incident=incident,
+                            execution_status=attempt.status.value,
+                            verification_status="not_executed",
+                            notes=f"Remediation execution failed across {incident.attempt_count} attempts. Escalated to on-call engineer.",
+                        )
+                        logger.warning(
+                            f"=== INCIDENT {incident.id} ESCALATED: Remediation failed across {incident.attempt_count} attempts ==="
+                        )
                     break
 
                 # 4. Independent Verification
@@ -205,18 +223,20 @@ class IncidentOrchestrator:
                     if verify_result.get("passed"):
                         # Pipeline resolved!
                         total_duration = round(time.perf_counter() - start_time, 2)
-                        kpi_tracker.record_remediation_result(success=True, duration_seconds=total_duration)
+                        remediation_ok = verify_result.get("remediation_succeeded", True)
+                        kpi_tracker.record_remediation_result(success=remediation_ok, duration_seconds=total_duration)
                         INCIDENTS_RESOLVED_TOTAL.labels(target=incident.target, action=attempt.action).inc()
                         ACTIVE_INCIDENTS.dec()
 
+                        outcome_str = verify_result.get("outcome", "REMEDIATION_SUCCEEDED_AND_VERIFIED")
                         self.audit_logger.record_from_incident(
                             incident=incident,
                             execution_status=attempt.status.value,
                             verification_status="passed",
-                            notes=f"Incident resolved in {total_duration}s after {incident.attempt_count} attempt(s).",
+                            notes=f"{outcome_str}: Incident resolved in {total_duration}s after {incident.attempt_count} attempt(s).",
                         )
                         logger.info(
-                            f"=== INCIDENT {incident.id} RESOLVED SUCCESSFULLY in {total_duration}s ==="
+                            f"=== INCIDENT {incident.id} RESOLVED ({outcome_str}) in {total_duration}s ==="
                         )
                         return incident
                     else:

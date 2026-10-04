@@ -1,12 +1,15 @@
 """Main FastAPI application entry point for OpsPilot."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Dict
 
-from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse
+from fastapi import Depends, FastAPI, Request, status
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api import api_router
+from app.audit.logger import AuditLogger
 from app.core.config import get_settings
 from app.core.exceptions import (
     IncidentNotFoundError,
@@ -17,7 +20,7 @@ from app.core.exceptions import (
     VerificationFailedError,
 )
 from app.core.logging import get_logger, setup_logging
-from app.dependencies import get_policy_engine
+from app.dependencies import get_audit_logger, get_policy_engine
 
 logger = get_logger("main")
 
@@ -59,10 +62,36 @@ app = FastAPI(
 # Attach API routes
 app.include_router(api_router)
 
+# Mount static assets
+_static_dir = Path(__file__).parent / "static"
+if _static_dir.is_dir():
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+
+
+@app.get("/dashboard", response_class=HTMLResponse, summary="Operations Dashboard", include_in_schema=False)
+async def dashboard() -> HTMLResponse:
+    """Serve the OpsPilot single-page operations dashboard."""
+    html_path = _static_dir / "dashboard.html"
+    return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+
+
+@app.get("/api/v1/audit", summary="Global audit trail")
+def get_global_audit(
+    audit_logger: AuditLogger = Depends(get_audit_logger),
+) -> Dict[str, Any]:
+    """Retrieve all audit entries across all incidents."""
+    entries = audit_logger.get_all_entries()
+    return {
+        "entries_count": len(entries),
+        "entries": [e.model_dump() for e in entries],
+    }
+
 
 @app.get("/", summary="Root index banner")
-def root_index() -> Dict[str, Any]:
+def root_index(request: Request) -> Any:
     """Root platform information and endpoint index."""
+    if "text/html" in request.headers.get("accept", ""):
+        return RedirectResponse(url="/dashboard", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     return {
         "name": "OpsPilot",
         "tagline": "Detect. Diagnose. Decide. Remediate. Verify.",
@@ -72,10 +101,12 @@ def root_index() -> Dict[str, Any]:
             "swagger": "/docs",
             "redoc": "/redoc",
         },
+        "dashboard": "/dashboard",
         "endpoints": {
             "health": "/health",
             "detailed_health": "/api/v1/health",
             "incidents": "/api/v1/incidents",
+            "audit": "/api/v1/audit",
             "metrics": "/metrics",
             "kpis": "/api/v1/metrics/kpi",
             "demo_failure": "/api/v1/demo/failure",

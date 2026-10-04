@@ -68,10 +68,33 @@ class AuditLogger:
             risk = incident.policy_decision.risk.value
             approval_required = incident.policy_decision.requires_approval
 
+        # Determine outcome semantics
+        outcome = "UNKNOWN"
+        if policy_decision == "blocked" or execution_status in {"blocked", "not_executed"}:
+            outcome = "BLOCKED_BY_POLICY"
+        elif execution_status == "denied":
+            outcome = "DENIED_BY_POLICY"
+        elif execution_status == "pending_approval":
+            outcome = "AWAITING_APPROVAL"
+        elif execution_status == "failure":
+            outcome = "REMEDIATION_FAILED"
+        elif verification_status == "passed":
+            if execution_status == "success":
+                outcome = "REMEDIATION_SUCCEEDED_AND_VERIFIED"
+            else:
+                outcome = "REMEDIATION_FAILED_BUT_RECOVERED_INDEPENDENTLY"
+        elif verification_status == "failed":
+            outcome = "REMEDIATION_FAILED"
+
+        # Calculate duration
+        now = datetime.now(timezone.utc)
+        duration_sec = round((now - incident.created_at).total_seconds(), 2)
+
         entry = AuditEntry(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=now,
             incident_id=incident.id,
             incident_type=incident.type.value,
+            severity=incident.severity.value,
             target=incident.target,
             diagnosis_source=diag_source,
             root_cause=root_cause,
@@ -83,6 +106,8 @@ class AuditLogger:
             verification_status=verification_status,
             attempt=incident.attempt_count,
             final_status=incident.status.value,
+            duration_seconds=duration_sec,
+            outcome=outcome,
             notes=notes,
         )
 

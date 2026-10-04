@@ -1,0 +1,2435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpsPilot — Autonomous Remediation Platform</title>
+  <meta name="description" content="OpsPilot: Policy-Driven Autonomous Operations & Remediation Dashboard" />
+  
+  <!-- Fonts: Inter (UI) & JetBrains Mono (Technical data) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* ============================================================
+       A. DESIGN SYSTEM TOKENS (Light, tegas, bermakna)
+       ============================================================ */
+    :root {
+      /* Backgrounds & Surfaces */
+      --bg:              #F4F6FA;
+      --surface:         #FFFFFF;
+      --surface-subtle:  #F8FAFC;
+      --surface-card:    #FFFFFF;
+      --border:          #E2E8F0;
+      --border-subtle:   #EDF2F7;
+      
+      /* Elevation */
+      --shadow-card:     0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.05);
+      --shadow-modal:    0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
+      --shadow-hover:    0 4px 14px rgba(15, 23, 42, 0.08);
+
+      /* Typography */
+      --text:            #0F172A;
+      --text-secondary:  #475569; /* Min 4.5:1 contrast on surface */
+      --text-muted:      #64748B;
+      --font-sans:       'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono:       'JetBrains Mono', 'Cascadia Code', monospace;
+
+      /* Primary & Interactive Accent */
+      --accent:          #4F46E5; /* Indigo */
+      --accent-hover:    #4338CA;
+      --accent-soft:     #EEF2FF;
+      --accent-border:   #C7D2FE;
+
+      /* Semantic Statuses */
+      --success:         #059669;
+      --success-soft:    #ECFDF5;
+      --success-border:  #A7F3D0;
+
+      --in-progress:     #0284C7;
+      --in-progress-soft:#F0F9FF;
+      --in-progress-border:#BAE6FD;
+
+      --blocked:         #7C3AED;
+      --blocked-soft:    #F5F3FF;
+      --blocked-border:  #DDD6FE;
+
+      --failed:          #DC2626;
+      --failed-soft:     #FEF2F2;
+      --failed-border:   #FECACA;
+
+      --warning:         #D97706;
+      --warning-soft:    #FFFBEB;
+      --warning-border:  #FDE68A;
+
+      /* Geometry */
+      --radius-card:     12px;
+      --radius-btn:      8px;
+      --radius-sm:       6px;
+      --radius-full:     9999px;
+
+      /* Transitions */
+      --transition-fast: 0.15s ease;
+      --transition:      0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Accessibility Focus Ring */
+    *:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Reset & Base */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      font-size: 14px;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Monospace Utility */
+    .mono {
+      font-family: var(--font-mono);
+      font-feature-settings: "zero" 1;
+    }
+
+    /* Main Container */
+    .dashboard-container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 16px 24px 40px;
+    }
+
+    /* ============================================================
+       B2. HEADER
+       ============================================================ */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-monogram {
+      width: 38px;
+      height: 38px;
+      background: var(--accent);
+      border-radius: var(--radius-btn);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -0.5px;
+      box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+    }
+
+    .brand-info h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.2px;
+      line-height: 1.2;
+    }
+
+    .brand-info p {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* Chips */
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: var(--radius-btn);
+      font-size: 0.78rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+      transition: var(--transition-fast);
+      user-select: none;
+    }
+
+    .status-chip .chip-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .status-chip.healthy {
+      background: var(--success-soft);
+      border-color: var(--success-border);
+      color: var(--success);
+    }
+    .status-chip.healthy .chip-dot {
+      background: var(--success);
+    }
+
+    .status-chip.down {
+      background: var(--failed-soft);
+      border-color: var(--failed-border);
+      color: var(--failed);
+    }
+    .status-chip.down .chip-dot {
+      background: var(--failed);
+      animation: pulse-dot 1.8s ease-in-out infinite;
+    }
+
+    .status-chip.ai-online {
+      background: var(--success-soft);
+      border-color: var(--success-border);
+      color: var(--success);
+    }
+
+    .status-chip.ai-offline {
+      background: var(--warning-soft);
+      border-color: var(--warning-border);
+      color: var(--warning);
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.15); }
+    }
+
+    /* Refresh Group */
+    .refresh-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .updated-text {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .btn-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-btn);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-secondary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+    .btn-icon:hover {
+      background: var(--surface-subtle);
+      border-color: var(--text-muted);
+      color: var(--text);
+    }
+    .btn-icon.spinning svg, .btn-icon.spinning i {
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ============================================================
+       B3. KEY METRICS (4 CARDS)
+       ============================================================ */
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .metric-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 14px 16px;
+      box-shadow: var(--shadow-card);
+      transition: var(--transition);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .metric-card:hover {
+      box-shadow: var(--shadow-hover);
+      border-color: #CBD5E1;
+    }
+
+    .metric-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .metric-title {
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .metric-icon-wrap {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+    }
+
+    .metric-value {
+      font-size: 1.65rem;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--text);
+    }
+
+    /* Dynamic Value Semantic Colors */
+    .metric-value.color-success { color: var(--success); }
+    .metric-value.color-warning { color: var(--warning); }
+    .metric-value.color-failed  { color: var(--failed); }
+    .metric-value.color-blocked { color: var(--blocked); }
+    .metric-value.color-muted   { color: var(--text-muted); }
+
+    .metric-sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Tooltip Badge */
+    .tooltip-tag {
+      cursor: help;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      border-bottom: 1px dashed var(--text-muted);
+    }
+
+    /* ============================================================
+       B4. PIPELINE STATE STEPPER
+       ============================================================ */
+    .pipeline-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 16px 20px;
+      box-shadow: var(--shadow-card);
+      margin-bottom: 20px;
+    }
+
+    .pipeline-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .pipeline-status-text {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+    .pipeline-status-text strong {
+      color: var(--text);
+    }
+
+    .pipeline-track {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      padding: 4px 10px;
+    }
+
+    .step-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      position: relative;
+      z-index: 2;
+      min-width: 72px;
+    }
+
+    .step-circle {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--surface-subtle);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: var(--transition);
+      position: relative;
+    }
+
+    .step-label {
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .step-label .step-num {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    /* Connector line */
+    .step-line {
+      flex: 1;
+      height: 3px;
+      background: var(--border);
+      margin: 0 -4px 22px;
+      position: relative;
+      z-index: 1;
+      transition: background var(--transition);
+    }
+    .step-line.done {
+      background: var(--success);
+    }
+    .step-line.active {
+      background: var(--in-progress);
+    }
+
+    /* Stepper States (5 states: idle, processing, done, blocked, escalated) */
+    /* 1. Idle */
+    .step-node.state-idle .step-circle {
+      border-color: var(--border);
+      background: var(--surface-subtle);
+      color: var(--text-muted);
+    }
+
+    /* 2. Processing */
+    .step-node.state-processing .step-circle {
+      border-color: var(--in-progress);
+      background: var(--in-progress-soft);
+      color: var(--in-progress);
+      animation: pulse-ring 1.8s infinite;
+    }
+    .step-node.state-processing .step-label {
+      color: var(--in-progress);
+      font-weight: 700;
+    }
+
+    /* 3. Done */
+    .step-node.state-done .step-circle {
+      border-color: var(--success);
+      background: var(--success);
+      color: #FFFFFF;
+      box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
+    }
+    .step-node.state-done .step-label {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* 4. Blocked */
+    .step-node.state-blocked .step-circle {
+      border-color: var(--blocked);
+      background: var(--blocked-soft);
+      color: var(--blocked);
+      box-shadow: 0 2px 6px rgba(124, 58, 237, 0.2);
+    }
+    .step-node.state-blocked .step-label {
+      color: var(--blocked);
+      font-weight: 700;
+    }
+
+    /* 5. Escalated / Failed */
+    .step-node.state-failed .step-circle {
+      border-color: var(--failed);
+      background: var(--failed-soft);
+      color: var(--failed);
+      box-shadow: 0 2px 6px rgba(220, 38, 38, 0.2);
+    }
+    .step-node.state-failed .step-label {
+      color: var(--failed);
+      font-weight: 700;
+    }
+
+    @keyframes pulse-ring {
+      0%   { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.35); }
+      70%  { box-shadow: 0 0 0 8px rgba(2, 132, 199, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0); }
+    }
+
+    /* Reduced Motion */
+    @media (prefers-reduced-motion: reduce) {
+      .step-node.state-processing .step-circle,
+      .status-chip.down .chip-dot {
+        animation: none !important;
+      }
+    }
+
+    /* ============================================================
+       B5 & B6. DUAL PANEL (SIMULATOR + INCIDENT DETAIL)
+       ============================================================ */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+      align-items: stretch;
+    }
+
+    .panel-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 16px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .panel-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .panel-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      letter-spacing: 0.5px;
+    }
+
+    /* Simulator Action Buttons */
+    .sim-button-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .btn-sim {
+      width: 100%;
+      min-height: 42px;
+      padding: 8px 12px;
+      border-radius: var(--radius-btn);
+      font-family: var(--font-sans);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: var(--transition-fast);
+      position: relative;
+      text-align: left;
+    }
+    .btn-sim:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-sim .btn-icon-box {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .btn-sim .btn-label {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.25;
+    }
+    .btn-sim .btn-sub {
+      font-size: 0.68rem;
+      font-weight: 400;
+      opacity: 0.85;
+    }
+
+    /* Button Variants */
+    /* 1. Primary: Run Full Demo (Solid Accent Indigo) */
+    .btn-sim-primary {
+      background: var(--accent);
+      color: #FFFFFF;
+      border: 1px solid var(--accent);
+    }
+    .btn-sim-primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    /* 2. Secondary Outline: Detect & Register */
+    .btn-sim-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-sim-secondary:hover:not(:disabled) {
+      background: var(--surface-subtle);
+      border-color: #CBD5E1;
+    }
+
+    /* 3. Subtle Green: Manual Recovery */
+    .btn-sim-recovery {
+      background: var(--success-soft);
+      color: var(--success);
+      border: 1px solid var(--success-border);
+    }
+    .btn-sim-recovery:hover:not(:disabled) {
+      background: #D1FAE5;
+    }
+
+    /* 4. Danger Accent: Inject Failure (with confirmation) */
+    .btn-sim-danger {
+      background: var(--failed-soft);
+      color: var(--failed);
+      border: 1px solid var(--failed-border);
+    }
+    .btn-sim-danger:hover:not(:disabled) {
+      background: #FEE2E2;
+    }
+
+    /* Loading state */
+    .btn-sim.is-loading .btn-icon-box svg,
+    .btn-sim.is-loading .btn-icon-box i {
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* ============================================================
+       B6. INCIDENT DETAIL PANEL
+       ============================================================ */
+    .detail-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Default Recent Incidents view (when nothing selected) */
+    .recent-incidents-box {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .recent-header {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .recent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .recent-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: var(--radius-btn);
+      border: 1px solid var(--border);
+      background: var(--surface-subtle);
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+    .recent-item:hover {
+      border-color: var(--accent-border);
+      background: var(--accent-soft);
+    }
+    .recent-item-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Active Incident Header */
+    .incident-meta-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .incident-meta-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .incident-id-text {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    /* Incident Grid Properties */
+    .incident-props-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+    }
+    .prop-box {
+      background: var(--surface-subtle);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+    }
+    .prop-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .prop-val {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-top: 2px;
+    }
+
+    /* Diagnosis & Policy Boxes */
+    .info-subcard {
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-btn);
+      padding: 10px 14px;
+    }
+    .subcard-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 6px;
+    }
+    .subcard-body {
+      font-size: 0.8rem;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    /* Confidence Bar */
+    .confidence-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 0;
+    }
+    .progress-bar-bg {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 3px;
+      transition: width var(--transition);
+    }
+
+    /* Action Tag */
+    .action-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* Collapsible Evidence Section */
+    .evidence-section {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-btn);
+      background: var(--surface-subtle);
+      overflow: hidden;
+    }
+    .evidence-trigger {
+      width: 100%;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-family: var(--font-sans);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .evidence-trigger:hover {
+      background: #F1F5F9;
+    }
+    .evidence-content {
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      background: #FFFFFF;
+      font-size: 0.72rem;
+      color: var(--text);
+      display: none;
+    }
+    .evidence-content.open {
+      display: block;
+    }
+    .evidence-code {
+      background: #F8FAFC;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      max-height: 140px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* Escalation Human Gate Buttons */
+    .escalation-gate-card {
+      background: var(--warning-soft);
+      border: 1px solid var(--warning-border);
+      border-radius: var(--radius-btn);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .gate-info {
+      font-size: 0.76rem;
+      color: var(--warning);
+      font-weight: 600;
+    }
+    .gate-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-gate-approve {
+      padding: 5px 12px;
+      border-radius: var(--radius-btn);
+      border: 1px solid var(--success-border);
+      background: var(--success);
+      color: #FFFFFF;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-gate-approve:hover { background: #047857; }
+    .btn-gate-reject {
+      padding: 5px 12px;
+      border-radius: var(--radius-btn);
+      border: 1px solid var(--failed-border);
+      background: var(--surface);
+      color: var(--failed);
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-gate-reject:hover { background: var(--failed-soft); }
+
+    /* ============================================================
+       B7. AUDIT TRAIL & INCIDENT HISTORY TABLES
+       ============================================================ */
+    .tables-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .table-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 16px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .table-top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .table-filters {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .filter-select {
+      font-family: var(--font-sans);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    .filter-select:hover {
+      border-color: #CBD5E1;
+    }
+
+    .table-scroll {
+      max-height: 280px;
+      overflow-y: auto;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-btn);
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.76rem;
+      text-align: left;
+    }
+
+    .data-table thead th {
+      position: sticky;
+      top: 0;
+      background: var(--surface-subtle);
+      color: var(--text-secondary);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.68rem;
+      letter-spacing: 0.5px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      z-index: 2;
+    }
+
+    .data-table tbody td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    /* Zebra striping */
+    .data-table tbody tr:nth-child(even) {
+      background: #FAFAFC;
+    }
+    .data-table tbody tr:hover {
+      background: var(--accent-soft);
+      cursor: pointer;
+    }
+
+    .empty-table-cell {
+      text-align: center;
+      padding: 32px 12px;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: var(--radius-sm);
+      font-size: 0.68rem;
+      font-weight: 600;
+      line-height: 1.3;
+      border: 1px solid transparent;
+    }
+
+    .badge.severity-critical { background: var(--failed-soft); border-color: var(--failed-border); color: var(--failed); }
+    .badge.severity-high     { background: #FFF7ED; border-color: #FFEDD5; color: #EA580C; }
+    .badge.severity-medium   { background: var(--warning-soft); border-color: var(--warning-border); color: var(--warning); }
+    .badge.severity-low      { background: var(--success-soft); border-color: var(--success-border); color: var(--success); }
+
+    .badge.status-resolved   { background: var(--success-soft); border-color: var(--success-border); color: var(--success); }
+    .badge.status-escalated  { background: var(--failed-soft); border-color: var(--failed-border); color: var(--failed); }
+    .badge.status-blocked    { background: var(--blocked-soft); border-color: var(--blocked-border); color: var(--blocked); }
+    .badge.status-progress   { background: var(--in-progress-soft); border-color: var(--in-progress-border); color: var(--in-progress); }
+
+    /* Outcome badge */
+    .badge-outcome {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      font-size: 0.66rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .badge-outcome.success { background: var(--success-soft); border-color: var(--success-border); color: var(--success); }
+    .badge-outcome.failed  { background: var(--failed-soft); border-color: var(--failed-border); color: var(--failed); }
+    .badge-outcome.blocked { background: var(--blocked-soft); border-color: var(--blocked-border); color: var(--blocked); }
+    .badge-outcome.neutral { background: var(--surface-subtle); border-color: var(--border); color: var(--text-secondary); }
+
+    /* ============================================================
+       MODAL CONFIRMATION DIALOG (Inject Failure)
+       ============================================================ */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(2px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-modal);
+      max-width: 500px;
+      width: 92%;
+      padding: 22px;
+      animation: modal-pop 0.15s ease-out;
+    }
+    @keyframes modal-pop {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .modal-header-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--failed-soft);
+      border: 1px solid var(--failed-border);
+      color: var(--failed);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-header h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .modal-body {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 18px;
+    }
+
+    /* Scenario Picker Options */
+    .scenario-picker {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .scenario-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-btn);
+      cursor: pointer;
+      transition: var(--transition-fast);
+      background: var(--surface-subtle);
+    }
+    .scenario-option:hover {
+      border-color: var(--accent-border);
+      background: var(--accent-soft);
+    }
+    .scenario-option input[type="radio"] {
+      margin-top: 3px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .scenario-label-wrap {
+      flex: 1;
+    }
+    .scenario-title {
+      font-weight: 600;
+      font-size: 0.82rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .scenario-desc {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+      line-height: 1.35;
+    }
+
+    .modal-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .btn-modal-cancel {
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-btn);
+      background: var(--surface);
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-modal-cancel:hover { background: var(--surface-subtle); }
+    .btn-modal-confirm {
+      padding: 6px 16px;
+      border: 1px solid var(--failed);
+      border-radius: var(--radius-btn);
+      background: var(--failed);
+      color: #FFFFFF;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-modal-confirm:hover { background: #B91C1C; }
+
+    /* ============================================================
+       TOAST SYSTEM
+       ============================================================ */
+    .toast-container {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 1100;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .toast {
+      padding: 10px 16px;
+      border-radius: var(--radius-btn);
+      font-size: 0.78rem;
+      font-weight: 500;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-left: 3px solid;
+      background: #FFFFFF;
+      pointer-events: auto;
+      max-width: 360px;
+      animation: toast-in 0.2s ease-out;
+    }
+    .toast.success { border-color: var(--success); color: var(--text); }
+    .toast.error   { border-color: var(--failed); color: var(--text); }
+    .toast.info    { border-color: var(--accent); color: var(--text); }
+    .toast.warning { border-color: var(--warning); color: var(--text); }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ============================================================
+       RESPONSIVE RULES
+       ============================================================ */
+    @media (max-width: 1080px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .incident-props-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    @media (max-width: 768px) {
+      .metrics-grid {
+        grid-template-columns: 1fr;
+      }
+      .pipeline-track {
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .step-line {
+        display: none;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .incident-props-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Toast Notification Stack -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Modal Confirmation Dialog (Inject Failure / Scenario Selector) -->
+  <div id="modal-inject-confirm" class="modal-backdrop">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-header-icon">
+          <i data-lucide="zap" style="width:18px;height:18px;"></i>
+        </div>
+        <h3>Simulate Anomaly / Inject Failure</h3>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom:6px;">Pilih skenario anomali untuk di-inject ke microservice <strong>payment-api</strong>:</p>
+        
+        <div class="scenario-picker">
+          <!-- Scenario 1: Bad Deployment -->
+          <label class="scenario-option">
+            <input type="radio" name="failure_type" value="deployment-failed" checked />
+            <div class="scenario-label-wrap">
+              <div class="scenario-title">
+                <span>Bad Deployment (v2.0.0 &middot; 503)</span>
+                <span class="badge severity-high">APPROVAL GATE</span>
+              </div>
+              <div class="scenario-desc">Simulasi deploy release bermasalah. Memicu rekomendasi Rollback dan memerlukan verifikasi Human Operator.</div>
+            </div>
+          </label>
+
+          <!-- Scenario 2: Service Crash / 500 Spike -->
+          <label class="scenario-option">
+            <input type="radio" name="failure_type" value="unhealthy" />
+            <div class="scenario-label-wrap">
+              <div class="scenario-title">
+                <span>Service Crash / 500 Spike</span>
+                <span class="badge severity-medium">AUTO-RESTART</span>
+              </div>
+              <div class="scenario-desc">Microservice mengembalikan HTTP 500 beruntun. OpsPilot mendeteksi dan mengeksekusi auto-restart playbook.</div>
+            </div>
+          </label>
+
+          <!-- Scenario 3: Latency Spike -->
+          <label class="scenario-option">
+            <input type="radio" name="failure_type" value="latency" />
+            <div class="scenario-label-wrap">
+              <div class="scenario-title">
+                <span>Latency Timeout Spike (5.0s)</span>
+                <span class="badge severity-low">THRESHOLD SPIKE</span>
+              </div>
+              <div class="scenario-desc">Request probe melampaui timeout batas SLO (&gt;5.0s). OpsPilot mendeteksi anomali health check.</div>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-inject" class="btn-modal-cancel">Batal</button>
+        <button id="btn-confirm-inject" class="btn-modal-confirm">Inject Skenario</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-container">
+    <!-- ======================== B2. HEADER ======================== -->
+    <header class="header">
+      <div class="header-brand">
+        <div class="brand-monogram">OP</div>
+        <div class="brand-info">
+          <h1>OpsPilot</h1>
+          <p>Detect &middot; Evidence &middot; Diagnose &middot; Policy &middot; Remediate &middot; Verify</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Target Service Status Chip -->
+        <div id="chip-target" class="status-chip healthy" title="Status Target Microservice">
+          <span class="chip-dot"></span>
+          <span id="chip-target-text">payment-api &middot; Checking...</span>
+        </div>
+
+        <!-- AI Engine Status Chip -->
+        <div id="chip-ai" class="status-chip ai-online" title="Status AI Model Provider">
+          <i data-lucide="cpu" style="width:14px;height:14px;"></i>
+          <span id="chip-ai-text">AI &middot; Checking...</span>
+        </div>
+
+        <!-- Refresh Trigger & Last Updated Time -->
+        <div class="refresh-group">
+          <span id="last-updated" class="updated-text mono">Updated 0s ago</span>
+          <button id="btn-refresh" class="btn-icon" aria-label="Refresh data" title="Refresh data">
+            <i data-lucide="refresh-cw" style="width:15px;height:15px;"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ======================== B3. KEY METRICS (4 CARDS) ======================== -->
+    <div class="section-label">
+      <i data-lucide="bar-chart-2" style="width:13px;height:13px;"></i>
+      Key Operational Metrics
+    </div>
+    <div class="metrics-grid">
+      <!-- Total Incidents -->
+      <div class="metric-card">
+        <div class="metric-top">
+          <span class="metric-title">Total Incidents</span>
+          <div class="metric-icon-wrap">
+            <i data-lucide="layers" style="width:15px;height:15px;"></i>
+          </div>
+        </div>
+        <div class="metric-value mono" id="kpi-total">0</div>
+        <div class="metric-sub">All tracked anomalies</div>
+      </div>
+
+      <!-- Success Rate (Fix B1 Bug: N/A with tooltip if no attempts) -->
+      <div class="metric-card">
+        <div class="metric-top">
+          <span class="metric-title">Success Rate</span>
+          <div class="metric-icon-wrap">
+            <i data-lucide="check-circle-2" style="width:15px;height:15px;"></i>
+          </div>
+        </div>
+        <div class="metric-value mono color-muted" id="kpi-success" title="Calculated as: Successful Remediations / Total Attempts * 100">N/A</div>
+        <div class="metric-sub" id="kpi-success-sub">
+          <span class="tooltip-tag" title="No remediation attempts executed yet. Run a demo to generate execution data.">Auto-remediation rate</span>
+        </div>
+      </div>
+
+      <!-- MTTR -->
+      <div class="metric-card">
+        <div class="metric-top">
+          <span class="metric-title">MTTR (Mean Time)</span>
+          <div class="metric-icon-wrap">
+            <i data-lucide="timer" style="width:15px;height:15px;"></i>
+          </div>
+        </div>
+        <div class="metric-value mono" id="kpi-mttr">0.0s</div>
+        <div class="metric-sub" id="kpi-mttr-sub">Target &lt; 60.0s</div>
+      </div>
+
+      <!-- Policy Blocks -->
+      <div class="metric-card">
+        <div class="metric-top">
+          <span class="metric-title">Policy Blocks</span>
+          <div class="metric-icon-wrap">
+            <i data-lucide="shield-alert" style="width:15px;height:15px;"></i>
+          </div>
+        </div>
+        <div class="metric-value mono color-muted" id="kpi-blocked">0</div>
+        <div class="metric-sub" id="kpi-blocked-sub">Last blocked: none</div>
+      </div>
+    </div>
+
+    <!-- ======================== B4. PIPELINE STATE STEPPER ======================== -->
+    <div class="pipeline-card">
+      <div class="pipeline-header">
+        <div class="section-label" style="margin-bottom:0;">
+          <i data-lucide="git-commit" style="width:14px;height:14px;"></i>
+          Autonomous Remediation Pipeline
+        </div>
+        <div class="pipeline-status-text" id="pipeline-status-desc">
+          Status: <strong>Idle</strong> &middot; Ready for anomaly detection
+        </div>
+      </div>
+
+      <div class="pipeline-track" id="pipeline-track">
+        <!-- 1. Detect -->
+        <div class="step-node state-idle" id="step-detect" data-step="detected">
+          <div class="step-circle" id="circle-detect" title="Stage 1: Probe target service for HTTP anomalies">
+            <i data-lucide="search" style="width:20px;height:20px;"></i>
+          </div>
+          <div class="step-label"><span class="step-num">1.</span> Detect</div>
+        </div>
+        <div class="step-line" id="line-1"></div>
+
+        <!-- 2. Evidence -->
+        <div class="step-node state-idle" id="step-evidence" data-step="investigating">
+          <div class="step-circle" id="circle-evidence" title="Stage 2: Collect Docker logs, HTTP probe telemetry">
+            <i data-lucide="file-text" style="width:20px;height:20px;"></i>
+          </div>
+          <div class="step-label"><span class="step-num">2.</span> Evidence</div>
+        </div>
+        <div class="step-line" id="line-2"></div>
+
+        <!-- 3. Diagnose -->
+        <div class="step-node state-idle" id="step-diagnose" data-step="diagnosed">
+          <div class="step-circle" id="circle-diagnose" title="Stage 3: Ollama LLM / Fallback heuristic root cause analysis">
+            <i data-lucide="brain" style="width:20px;height:20px;"></i>
+          </div>
+          <div class="step-label"><span class="step-num">3.</span> Diagnose</div>
+        </div>
+        <div class="step-line" id="line-3"></div>
+
+        <!-- 4. Policy -->
+        <div class="step-node state-idle" id="step-policy" data-step="policy_checked">
+          <div class="step-circle" id="circle-policy" title="Stage 4: Deterministic rule verification via remediation.yaml">
+            <i data-lucide="shield-check" style="width:20px;height:20px;"></i>
+          </div>
+          <div class="step-label"><span class="step-num">4.</span> Policy</div>
+        </div>
+        <div class="step-line" id="line-4"></div>
+
+        <!-- 5. Remediate -->
+        <div class="step-node state-idle" id="step-remediate" data-step="remediating">
+          <div class="step-circle" id="circle-remediate" title="Stage 5: Ansible playbook execution in isolated environment">
+            <i data-lucide="wrench" style="width:20px;height:20px;"></i>
+          </div>
+          <div class="step-label"><span class="step-num">5.</span> Remediate</div>
+        </div>
+        <div class="step-line" id="line-5"></div>
+
+        <!-- 6. Verify -->
+        <div class="step-node state-idle" id="step-verify" data-step="resolved">
+          <div class="step-circle" id="circle-verify" title="Stage 6: Independent health check verification">
+            <i data-lucide="check-circle" style="width:20px;height:20px;"></i>
+          </div>
+          <div class="step-label"><span class="step-num">6.</span> Verify</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================== B5 & B6. DUAL PANEL ======================== -->
+    <div class="main-grid">
+      <!-- B5. Simulator Controls Panel (Left) -->
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title">
+            <i data-lucide="sliders" style="width:14px;height:14px;"></i>
+            Simulator Control
+          </div>
+          <span class="panel-badge">SANDBOX / DEMO</span>
+        </div>
+
+        <div class="sim-button-list">
+          <!-- 1. Run Full Demo (Primary Accent Indigo) -->
+          <button id="btn-run-demo" class="btn-sim btn-sim-primary" title="Automated pipeline: Inject -> Detect -> Remediate -> Verify">
+            <div class="btn-icon-box">
+              <i data-lucide="play" style="width:16px;height:16px;"></i>
+            </div>
+            <div class="btn-label">
+              <span>Run Full Demo</span>
+              <span class="btn-sub">End-to-end automated recovery</span>
+            </div>
+          </button>
+
+          <!-- 2. Detect & Register (Secondary Outline) -->
+          <button id="btn-trigger-detect" class="btn-sim btn-sim-secondary" title="Scan target service and record incident if anomalous">
+            <div class="btn-icon-box">
+              <i data-lucide="search" style="width:16px;height:16px;"></i>
+            </div>
+            <div class="btn-label">
+              <span>Detect &amp; Register</span>
+              <span class="btn-sub">Probe target for anomalies</span>
+            </div>
+          </button>
+
+          <!-- 3. Manual Recovery (Subtle Green) -->
+          <button id="btn-manual-recover" class="btn-sim btn-sim-recovery" title="Reset payment-api health status to 200 OK">
+            <div class="btn-icon-box">
+              <i data-lucide="activity" style="width:16px;height:16px;"></i>
+            </div>
+            <div class="btn-label">
+              <span>Manual Recovery</span>
+              <span class="btn-sub">Reset target to healthy state</span>
+            </div>
+          </button>
+
+          <!-- 4. Inject Failure (Danger Accent + Confirmation) -->
+          <button id="btn-open-inject-modal" class="btn-sim btn-sim-danger" title="Forces target service payment-api into 500 unhealthy status">
+            <div class="btn-icon-box">
+              <i data-lucide="zap" style="width:16px;height:16px;"></i>
+            </div>
+            <div class="btn-label">
+              <span>Inject Failure</span>
+              <span class="btn-sub">Trigger simulated fault (500)</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- B6. Incident Detail Panel (Right) -->
+      <div class="panel-card" id="incident-detail-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <i data-lucide="file-search" style="width:14px;height:14px;"></i>
+            Incident Inspector
+          </div>
+          <span id="detail-active-tag" class="panel-badge">SELECT INCIDENT</span>
+        </div>
+
+        <div id="detail-body" class="detail-container">
+          <!-- Will be rendered dynamically via renderIncidentDetail() -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================== B7. AUDIT TRAIL & INCIDENTS ======================== -->
+    <div class="tables-grid">
+      <!-- 1. Audit Trail Table -->
+      <div class="table-card">
+        <div class="table-top-bar">
+          <div class="panel-title">
+            <i data-lucide="shield" style="width:14px;height:14px;"></i>
+            Compliance Audit Trail
+          </div>
+          <span class="metric-sub mono" id="audit-count-badge">0 entries</span>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table" id="table-audit">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Incident ID</th>
+                <th>Recommended Action</th>
+                <th>Policy Decision</th>
+                <th>Execution</th>
+                <th>Verification</th>
+                <th>Outcome</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody id="audit-table-body">
+              <tr>
+                <td colspan="8" class="empty-table-cell">No audit entries recorded yet. Run a demo to generate compliance logs.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 2. Incident History Table with Filters -->
+      <div class="table-card">
+        <div class="table-top-bar">
+          <div class="panel-title">
+            <i data-lucide="history" style="width:14px;height:14px;"></i>
+            Incident History
+          </div>
+          <div class="table-filters">
+            <!-- Filter by Severity -->
+            <select id="filter-severity" class="filter-select" aria-label="Filter by Severity">
+              <option value="ALL">Severity: All</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+
+            <!-- Filter by Status -->
+            <select id="filter-status" class="filter-select" aria-label="Filter by Status">
+              <option value="ALL">Status: All</option>
+              <option value="resolved">Resolved</option>
+              <option value="escalated">Escalated</option>
+              <option value="blocked">Blocked</option>
+              <option value="in_progress">In Progress</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table" id="table-incidents">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Type</th>
+                <th>Severity</th>
+                <th>Target</th>
+                <th>Status</th>
+                <th>Attempts</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="incidents-table-body">
+              <tr>
+                <td colspan="7" class="empty-table-cell">No incident records found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       APPLICATION LOGIC & EVENT HANDLERS
+       ============================================================ -->
+  <script>
+    // ── Application State ──
+    const API_BASE = window.location.origin;
+    const MTTR_THRESHOLD_SECONDS = 60.0;
+
+    let incidentsList = [];
+    let auditList = [];
+    let currentIncidentId = null;
+    let secondsSinceUpdate = 0;
+    let isPipelineRunning = false;
+
+    // ── Lucide Icon Initializer ──
+    function refreshIcons() {
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    }
+
+    // ── Toast Notification System ──
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      
+      const iconMap = {
+        success: 'check-circle',
+        error: 'alert-triangle',
+        warning: 'alert-circle',
+        info: 'info'
+      };
+      const iconName = iconMap[type] || 'info';
+
+      toast.innerHTML = `<i data-lucide="${iconName}" style="width:16px;height:16px;"></i><span>${msg}</span>`;
+      container.appendChild(toast);
+      refreshIcons();
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-8px)';
+        toast.style.transition = 'all 0.2s ease';
+        setTimeout(() => toast.remove(), 250);
+      }, 4000);
+    }
+
+    // ── API Fetch Wrapper ──
+    async function fetchApi(path, options = {}) {
+      try {
+        const response = await fetch(`${API_BASE}${path}`, {
+          headers: { 'Content-Type': 'application/json' },
+          ...options
+        });
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || errData.message || `Request failed (${response.status})`);
+        }
+        return await response.json();
+      } catch (err) {
+        console.error(`API Error on [${path}]:`, err);
+        throw err;
+      }
+    }
+
+    // ── B2. Refresh System Health (Header) ──
+    async function loadHealthStatus() {
+      try {
+        const data = await fetchApi('/api/v1/health');
+        const target = data.components?.target_service;
+        const ollama = data.components?.ollama_ai;
+
+        // Target Service Chip
+        const chipTarget = document.getElementById('chip-target');
+        const chipTargetText = document.getElementById('chip-target-text');
+        if (target?.reachable) {
+          chipTarget.className = 'status-chip healthy';
+          chipTargetText.textContent = `${target.name || 'payment-api'} · Healthy`;
+        } else {
+          chipTarget.className = 'status-chip down';
+          chipTargetText.textContent = `${target?.name || 'payment-api'} · Down`;
+        }
+
+        // AI Engine Chip
+        const chipAi = document.getElementById('chip-ai');
+        const chipAiText = document.getElementById('chip-ai-text');
+        if (ollama?.reachable) {
+          chipAi.className = 'status-chip ai-online';
+          chipAiText.textContent = `AI Online · ${ollama.model || 'llama3.2'}`;
+        } else {
+          chipAi.className = 'status-chip ai-offline';
+          chipAiText.textContent = 'AI Offline · Heuristic mode';
+        }
+      } catch (e) {
+        const chipTarget = document.getElementById('chip-target');
+        chipTarget.className = 'status-chip down';
+        document.getElementById('chip-target-text').textContent = 'Target · Unreachable';
+
+        const chipAi = document.getElementById('chip-ai');
+        chipAi.className = 'status-chip ai-offline';
+        document.getElementById('chip-ai-text').textContent = 'AI Offline · Fallback mode';
+      }
+      refreshIcons();
+    }
+
+    // ── B1 & B3. Key Metrics (KPIs) ──
+    async function loadMetrics() {
+      try {
+        const data = await fetchApi('/api/v1/metrics/kpi');
+        const k = data.kpis || {};
+
+        // 1. Total Incidents
+        const total = k.total_incidents ?? incidentsList.length ?? 0;
+        document.getElementById('kpi-total').textContent = total;
+
+        // 2. Success Rate (B1 Bug Fix)
+        const successRateEl = document.getElementById('kpi-success');
+        const successSubEl = document.getElementById('kpi-success-sub');
+        
+        // Check if there are attempts
+        const attempts = k.total_remediation_attempts ?? 0;
+        const srVal = k.success_rate ?? k.remediation_success_rate_percent;
+
+        if (attempts === 0 || srVal == null) {
+          successRateEl.textContent = 'N/A';
+          successRateEl.className = 'metric-value mono color-muted';
+          successRateEl.setAttribute('title', 'No remediation attempts recorded yet. Run a demo to generate execution data.');
+          successSubEl.innerHTML = '<span class="tooltip-tag" title="No attempts executed yet.">No attempts yet</span>';
+        } else {
+          const numSr = Number(srVal);
+          successRateEl.textContent = `${numSr.toFixed(1)}%`;
+          successRateEl.setAttribute('title', `${k.successful_remediations} successes out of ${attempts} attempts`);
+          successSubEl.textContent = `${k.successful_remediations} / ${attempts} succeeded`;
+
+          // Color scale
+          if (numSr >= 90.0) {
+            successRateEl.className = 'metric-value mono color-success';
+          } else if (numSr >= 60.0) {
+            successRateEl.className = 'metric-value mono color-warning';
+          } else {
+            successRateEl.className = 'metric-value mono color-failed';
+          }
+        }
+
+        // 3. MTTR
+        const mttrEl = document.getElementById('kpi-mttr');
+        const mttrSubEl = document.getElementById('kpi-mttr-sub');
+        const mttrSec = k.mttr_seconds != null ? Number(k.mttr_seconds) : 0.0;
+        mttrEl.textContent = `${mttrSec.toFixed(1)}s`;
+
+        if (mttrSec > 0 && mttrSec <= MTTR_THRESHOLD_SECONDS) {
+          mttrEl.className = 'metric-value mono color-success';
+          mttrSubEl.textContent = `Within target (< ${MTTR_THRESHOLD_SECONDS}s)`;
+        } else if (mttrSec > MTTR_THRESHOLD_SECONDS) {
+          mttrEl.className = 'metric-value mono color-warning';
+          mttrSubEl.textContent = `Exceeds target (${MTTR_THRESHOLD_SECONDS}s)`;
+        } else {
+          mttrEl.className = 'metric-value mono';
+          mttrSubEl.textContent = `Target < ${MTTR_THRESHOLD_SECONDS}s`;
+        }
+
+        // 4. Policy Blocks
+        const blockedEl = document.getElementById('kpi-blocked');
+        const blockedSubEl = document.getElementById('kpi-blocked-sub');
+        // Count from kpis or fallback to incidents/audit count
+        let blockedCount = k.policy_blocks ?? 0;
+        if (blockedCount === 0 && auditList.length > 0) {
+          blockedCount = auditList.filter(e => e.policy_decision === 'blocked' || (e.outcome && e.outcome.includes('BLOCKED'))).length;
+        }
+
+        blockedEl.textContent = blockedCount;
+        if (blockedCount > 0) {
+          blockedEl.className = 'metric-value mono color-blocked';
+          blockedSubEl.textContent = 'Active safety blocks';
+        } else {
+          blockedEl.className = 'metric-value mono color-muted';
+          blockedSubEl.textContent = 'Last blocked: none';
+        }
+
+      } catch (err) {
+        console.warn('Could not load KPIs:', err);
+      }
+    }
+
+    // ── B4. Pipeline Stepper State ──
+    function updatePipelineStepper(incident) {
+      const stepNodes = [
+        { id: 'step-detect', circle: 'circle-detect', line: 'line-1', icon: 'search' },
+        { id: 'step-evidence', circle: 'circle-evidence', line: 'line-2', icon: 'file-text' },
+        { id: 'step-diagnose', circle: 'circle-diagnose', line: 'line-3', icon: 'brain' },
+        { id: 'step-policy', circle: 'circle-policy', line: 'line-4', icon: 'shield-check' },
+        { id: 'step-remediate', circle: 'circle-remediate', line: 'line-5', icon: 'wrench' },
+        { id: 'step-verify', circle: 'circle-verify', line: null, icon: 'check-circle' }
+      ];
+
+      const statusDesc = document.getElementById('pipeline-status-desc');
+
+      if (!incident) {
+        // Reset to Idle
+        stepNodes.forEach(node => {
+          const el = document.getElementById(node.id);
+          el.className = 'step-node state-idle';
+          document.getElementById(node.circle).innerHTML = `<i data-lucide="${node.icon}" style="width:20px;height:20px;"></i>`;
+          if (node.line) document.getElementById(node.line).className = 'step-line';
+        });
+        statusDesc.innerHTML = 'Status: <strong>Idle</strong> &middot; Ready for anomaly detection';
+        refreshIcons();
+        return;
+      }
+
+      const status = incident.status;
+      statusDesc.innerHTML = `Incident <strong class="mono">${incident.id}</strong> &middot; Target: <strong>${incident.target}</strong> &middot; State: <span class="badge status-${status}">${status.toUpperCase()}</span>`;
+
+      // Stages index map:
+      // 0: detected, 1: investigating, 2: diagnosed, 3: policy_checked/awaiting_approval, 4: remediating, 5: verifying, resolved
+      let activeIndex = 0;
+      let isBlocked = (status === 'blocked');
+      let isEscalated = (status === 'escalated');
+      let isResolved = (status === 'resolved');
+
+      if (status === 'detected') activeIndex = 0;
+      else if (status === 'investigating') activeIndex = 1;
+      else if (status === 'diagnosed') activeIndex = 2;
+      else if (status === 'awaiting_approval') activeIndex = 3;
+      else if (status === 'remediating') activeIndex = 4;
+      else if (status === 'verifying') activeIndex = 5;
+      else if (status === 'resolved') activeIndex = 6;
+      else if (status === 'blocked') activeIndex = 3;
+      else if (status === 'escalated') activeIndex = 5;
+
+      stepNodes.forEach((node, idx) => {
+        const nodeEl = document.getElementById(node.id);
+        const circleEl = document.getElementById(node.circle);
+        const lineEl = node.line ? document.getElementById(node.line) : null;
+
+        if (isBlocked && idx === 3) {
+          // Blocked at policy stage
+          nodeEl.className = 'step-node state-blocked';
+          circleEl.innerHTML = `<i data-lucide="shield-alert" style="width:20px;height:20px;"></i>`;
+          if (lineEl) lineEl.className = 'step-line';
+        } else if (isEscalated && idx === activeIndex) {
+          // Failed / Escalated at current stage
+          nodeEl.className = 'step-node state-failed';
+          circleEl.innerHTML = `<i data-lucide="alert-triangle" style="width:20px;height:20px;"></i>`;
+          if (lineEl) lineEl.className = 'step-line';
+        } else if (idx < activeIndex || (isResolved && idx <= 5)) {
+          // Completed stage
+          nodeEl.className = 'step-node state-done';
+          circleEl.innerHTML = `<i data-lucide="check" style="width:20px;height:20px;"></i>`;
+          if (lineEl) lineEl.className = 'step-line done';
+        } else if (idx === activeIndex) {
+          // In progress
+          nodeEl.className = 'step-node state-processing';
+          circleEl.innerHTML = `<i data-lucide="${node.icon}" style="width:20px;height:20px;"></i>`;
+          if (lineEl) lineEl.className = 'step-line active';
+        } else {
+          // Idle / Future stage
+          nodeEl.className = 'step-node state-idle';
+          circleEl.innerHTML = `<i data-lucide="${node.icon}" style="width:20px;height:20px;"></i>`;
+          if (lineEl) lineEl.className = 'step-line';
+        }
+      });
+
+      refreshIcons();
+    }
+
+    // ── B6. Incident Detail Panel ──
+    async function selectIncident(incidentId) {
+      currentIncidentId = incidentId;
+      try {
+        const inc = await fetchApi(`/api/v1/incidents/${incidentId}`);
+        renderActiveIncident(inc);
+        updatePipelineStepper(inc);
+      } catch (err) {
+        showToast(`Could not load incident details: ${err.message}`, 'error');
+      }
+    }
+
+    function renderActiveIncident(inc) {
+      const container = document.getElementById('detail-body');
+      document.getElementById('detail-active-tag').textContent = `ACTIVE: ${inc.id}`;
+
+      // Diagnosis Confidence
+      const confidence = inc.diagnosis?.confidence != null ? Math.round(inc.diagnosis.confidence * 100) : 0;
+
+      // Policy decision info
+      const policyAllowed = inc.policy_decision?.allowed;
+      const policyRisk = inc.policy_decision?.risk || 'unknown';
+      const policyReason = inc.policy_decision?.reason || '';
+
+      // Evidence info
+      const logs = inc.evidence?.recent_logs ? inc.evidence.recent_logs.join('\n') : 'No log buffer captured.';
+      const httpHealth = inc.evidence?.http_probe ? JSON.stringify(inc.evidence.http_probe, null, 2) : 'No probe data.';
+
+      // Check if awaiting approval or escalated
+      const showGateButtons = (inc.status === 'awaiting_approval' || inc.status === 'escalated');
+
+      container.innerHTML = `
+        <div class="incident-meta-header">
+          <div class="incident-meta-title">
+            <span class="incident-id-text mono">${inc.id}</span>
+            <span class="badge severity-${inc.severity}">${inc.severity.toUpperCase()}</span>
+            <span class="badge status-${inc.status}">${inc.status.toUpperCase()}</span>
+          </div>
+          <button id="btn-close-detail" class="btn-icon" title="Back to Recent List" aria-label="Close detail">
+            <i data-lucide="x" style="width:14px;height:14px;"></i>
+          </button>
+        </div>
+
+        <!-- 6 Properties Grid -->
+        <div class="incident-props-grid">
+          <div class="prop-box">
+            <div class="prop-label">Type</div>
+            <div class="prop-val mono" style="font-size:0.72rem;">${inc.type}</div>
+          </div>
+          <div class="prop-box">
+            <div class="prop-label">Target</div>
+            <div class="prop-val mono">${inc.target}</div>
+          </div>
+          <div class="prop-box">
+            <div class="prop-label">Attempts</div>
+            <div class="prop-val mono">${inc.attempt_count} / ${inc.max_attempts}</div>
+          </div>
+          <div class="prop-box">
+            <div class="prop-label">Severity</div>
+            <div class="prop-val mono">${inc.severity}</div>
+          </div>
+          <div class="prop-box">
+            <div class="prop-label">Created</div>
+            <div class="prop-val mono" style="font-size:0.7rem;">${formatTime(inc.created_at)}</div>
+          </div>
+          <div class="prop-box">
+            <div class="prop-label">Updated</div>
+            <div class="prop-val mono" style="font-size:0.7rem;">${formatTime(inc.updated_at)}</div>
+          </div>
+        </div>
+
+        <!-- Diagnosis Subcard -->
+        <div class="info-subcard">
+          <div class="subcard-head">
+            <span>Diagnosis &middot; ${inc.diagnosis?.source || 'Automated'}</span>
+            ${inc.diagnosis ? `<span class="mono">${confidence}% confidence</span>` : ''}
+          </div>
+          <div class="subcard-body">
+            ${inc.diagnosis ? `
+              <div><strong>Root Cause:</strong> ${inc.diagnosis.root_cause}</div>
+              <div style="margin:4px 0;"><strong>Action:</strong> <span class="action-tag mono"><i data-lucide="terminal" style="width:12px;height:12px;"></i>${inc.diagnosis.recommended_action}</span></div>
+              <div class="confidence-wrap">
+                <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${confidence}%;"></div></div>
+              </div>
+              ${inc.diagnosis.reasoning_summary ? `<div style="font-size:0.73rem;color:var(--text-secondary);margin-top:4px;">${inc.diagnosis.reasoning_summary}</div>` : ''}
+            ` : '<span style="color:var(--text-muted);">Diagnosis not yet performed for this incident.</span>'}
+          </div>
+        </div>
+
+        <!-- Policy Decision Subcard -->
+        <div class="info-subcard">
+          <div class="subcard-head">
+            <span>Policy Engine Check</span>
+            <span class="badge severity-${policyRisk}">RISK: ${policyRisk.toUpperCase()}</span>
+          </div>
+          <div class="subcard-body">
+            ${inc.policy_decision ? `
+              <div style="display:flex;align-items:center;gap:12px;">
+                <span><strong>Authorized:</strong> ${policyAllowed ? '<span style="color:var(--success);font-weight:600;">Yes</span>' : '<span style="color:var(--failed);font-weight:600;">No (Blocked)</span>'}</span>
+                <span><strong>Requires Approval:</strong> ${inc.policy_decision.requires_approval ? 'Yes' : 'No'}</span>
+              </div>
+              ${policyReason ? `<div style="font-size:0.73rem;color:var(--text-secondary);margin-top:4px;">${policyReason}</div>` : ''}
+            ` : '<span style="color:var(--text-muted);">Policy check pending.</span>'}
+          </div>
+        </div>
+
+        <!-- Collapsible Evidence Section -->
+        <div class="evidence-section">
+          <button id="btn-toggle-evidence" class="evidence-trigger" aria-expanded="false">
+            <span style="display:flex;align-items:center;gap:6px;">
+              <i data-lucide="file-code" style="width:14px;height:14px;"></i>
+              Diagnostic Evidence &amp; Telemetry
+            </span>
+            <i data-lucide="chevron-down" id="chevron-evidence" style="width:14px;height:14px;transition:transform 0.2s;"></i>
+          </button>
+          <div id="content-evidence" class="evidence-content">
+            <div style="font-weight:600;margin-bottom:4px;">Container Log Buffer:</div>
+            <pre class="evidence-code mono">${escapeHtml(logs)}</pre>
+            <div style="font-weight:600;margin:6px 0 4px;">Target HTTP Probe Result:</div>
+            <pre class="evidence-code mono">${escapeHtml(httpHealth)}</pre>
+          </div>
+        </div>
+
+        <!-- Escalation / Approval Gate -->
+        ${showGateButtons ? `
+          <div class="escalation-gate-card">
+            <div class="gate-info">
+              <i data-lucide="alert-circle" style="width:14px;height:14px;display:inline;vertical-align:middle;"></i>
+              <span>${inc.status === 'awaiting_approval' ? 'Action requires human approval' : 'Incident escalated to operator'}</span>
+            </div>
+            <div class="gate-actions">
+              <button id="btn-gate-approve" class="btn-gate-approve"><i data-lucide="check" style="width:13px;height:13px;"></i>Approve</button>
+              <button id="btn-gate-reject" class="btn-gate-reject"><i data-lucide="x" style="width:13px;height:13px;"></i>Reject</button>
+            </div>
+          </div>
+        ` : ''}
+      `;
+
+      // Event: Close / Reset detail
+      document.getElementById('btn-close-detail').addEventListener('click', () => {
+        currentIncidentId = null;
+        renderRecentIncidentsFallback();
+        updatePipelineStepper(null);
+      });
+
+      // Event: Evidence toggle
+      const evidenceBtn = document.getElementById('btn-toggle-evidence');
+      const evidenceContent = document.getElementById('content-evidence');
+      const evidenceChevron = document.getElementById('chevron-evidence');
+      evidenceBtn.addEventListener('click', () => {
+        const isOpen = evidenceContent.classList.toggle('open');
+        evidenceBtn.setAttribute('aria-expanded', String(isOpen));
+        evidenceChevron.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+      });
+
+      // Event: Gate buttons
+      if (showGateButtons) {
+        document.getElementById('btn-gate-approve')?.addEventListener('click', async () => {
+          if (inc.status === 'awaiting_approval') {
+            try {
+              showToast('Approving remediation plan...', 'info');
+              await fetchApi(`/api/v1/incidents/${inc.id}/approve`, {
+                method: 'POST',
+                body: JSON.stringify({ approved_by: 'oncall_engineer', note: 'Authorized via web dashboard' })
+              });
+              showToast('Remediation approved. Resuming pipeline execution...', 'info');
+              const runRes = await fetchApi(`/api/v1/incidents/${inc.id}/run`, { method: 'POST' });
+              showToast(`Remediation executed: ${runRes.status.toUpperCase()}`, runRes.status === 'resolved' ? 'success' : 'warning');
+              await selectIncident(inc.id);
+              await refreshAll();
+            } catch (err) {
+              showToast(`Approval execution failed: ${err.message}`, 'error');
+            }
+          } else {
+            showToast('Operator approval recorded for escalated incident.', 'info');
+          }
+        });
+
+        document.getElementById('btn-gate-reject')?.addEventListener('click', async () => {
+          try {
+            showToast('Rejecting remediation action...', 'info');
+            await fetchApi(`/api/v1/incidents/${inc.id}/reject`, {
+              method: 'POST',
+              body: JSON.stringify({ approved_by: 'oncall_engineer', note: 'Operator denied automated remediation from dashboard' })
+            });
+            showToast('Action rejected. Incident escalated to human on-call.', 'warning');
+            await selectIncident(inc.id);
+            await refreshAll();
+          } catch (err) {
+            showToast(`Reject failed: ${err.message}`, 'error');
+          }
+        });
+      }
+
+      refreshIcons();
+    }
+
+    function renderRecentIncidentsFallback() {
+      const container = document.getElementById('detail-body');
+      document.getElementById('detail-active-tag').textContent = 'RECENT INCIDENTS';
+
+      if (!incidentsList.length) {
+        container.innerHTML = `
+          <div style="text-align:center;padding:32px 16px;color:var(--text-muted);">
+            <i data-lucide="inbox" style="width:32px;height:32px;margin-bottom:8px;opacity:0.6;"></i>
+            <div style="font-weight:600;font-size:0.85rem;color:var(--text);">No Incidents Recorded</div>
+            <div style="font-size:0.75rem;margin-top:4px;">Run a demo in the simulator to test automated remediation.</div>
+          </div>
+        `;
+        refreshIcons();
+        return;
+      }
+
+      const recent3 = incidentsList.slice(0, 3);
+      container.innerHTML = `
+        <div class="recent-incidents-box">
+          <div class="recent-header">
+            Select an incident below or trigger a simulation:
+          </div>
+          <div class="recent-list">
+            ${recent3.map(inc => `
+              <div class="recent-item" onclick="selectIncident('${inc.id}')" title="Inspect ${inc.id}">
+                <div class="recent-item-left">
+                  <span class="mono" style="font-weight:700;color:var(--accent);">${inc.id}</span>
+                  <span class="badge severity-${inc.severity}">${inc.severity}</span>
+                  <span class="mono" style="font-size:0.72rem;color:var(--text-muted);">${inc.target}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span class="badge status-${inc.status}">${inc.status}</span>
+                  <i data-lucide="chevron-right" style="width:14px;height:14px;color:var(--text-muted);"></i>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          <div style="font-size:0.72rem;color:var(--text-muted);text-align:center;margin-top:6px;">
+            Run a demo or click an incident to inspect root cause &amp; evidence.
+          </div>
+        </div>
+      `;
+      refreshIcons();
+    }
+
+    // ── B7. Tables: Audit Trail & Incidents ──
+    async function loadAuditTrail() {
+      try {
+        const data = await fetchApi('/api/v1/audit');
+        auditList = data.entries || [];
+        document.getElementById('audit-count-badge').textContent = `${auditList.length} entries`;
+
+        const tbody = document.getElementById('audit-table-body');
+        if (!auditList.length) {
+          tbody.innerHTML = '<tr><td colspan="8" class="empty-table-cell">No audit entries recorded yet. Run a demo to generate compliance logs.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = auditList.slice().reverse().map(e => {
+          const outcomeClass = getOutcomeClass(e.outcome);
+          const durationStr = e.duration_seconds != null ? `${e.duration_seconds.toFixed(1)}s` : '—';
+          return `
+            <tr onclick="selectIncident('${e.incident_id}')" title="Inspect incident ${e.incident_id}">
+              <td class="mono" style="font-size:0.72rem;">${formatTime(e.timestamp)}</td>
+              <td class="mono" style="font-weight:600;color:var(--accent);">${e.incident_id}</td>
+              <td class="mono" style="color:var(--text-secondary);">${e.recommended_action}</td>
+              <td><span class="badge status-${e.policy_decision}">${e.policy_decision}</span></td>
+              <td><span class="badge ${e.execution_status === 'success' ? 'status-resolved' : (e.execution_status === 'not_executed' ? 'status-blocked' : 'status-escalated')}">${e.execution_status}</span></td>
+              <td><span class="badge ${e.verification_status === 'passed' ? 'status-resolved' : (e.verification_status === 'not_executed' ? 'status-blocked' : 'status-escalated')}">${e.verification_status}</span></td>
+              <td><span class="badge-outcome ${outcomeClass} mono">${e.outcome || 'UNKNOWN'}</span></td>
+              <td class="mono" style="color:var(--text-secondary);">${durationStr}</td>
+            </tr>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.warn('Failed loading audit:', err);
+      }
+    }
+
+    async function loadIncidents() {
+      try {
+        const list = await fetchApi('/api/v1/incidents');
+        incidentsList = Array.isArray(list) ? list.slice().reverse() : [];
+        renderFilteredIncidents();
+        
+        // If an incident was selected, refresh it, else show recent fallback
+        if (currentIncidentId) {
+          const found = incidentsList.find(i => i.id === currentIncidentId);
+          if (found) {
+            renderActiveIncident(found);
+            updatePipelineStepper(found);
+          } else {
+            renderRecentIncidentsFallback();
+          }
+        } else {
+          renderRecentIncidentsFallback();
+        }
+
+      } catch (err) {
+        console.warn('Failed loading incidents:', err);
+      }
+    }
+
+    function renderFilteredIncidents() {
+      const severityFilter = document.getElementById('filter-severity').value;
+      const statusFilter = document.getElementById('filter-status').value;
+
+      const filtered = incidentsList.filter(inc => {
+        if (severityFilter !== 'ALL' && inc.severity !== severityFilter) return false;
+        if (statusFilter !== 'ALL') {
+          if (statusFilter === 'in_progress') {
+            if (['resolved', 'escalated', 'blocked'].includes(inc.status)) return false;
+          } else if (inc.status !== statusFilter) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      const tbody = document.getElementById('incidents-table-body');
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-table-cell">No incidents match the active filters.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(inc => `
+        <tr onclick="selectIncident('${inc.id}')" title="Click to inspect incident ${inc.id}">
+          <td class="mono" style="font-weight:700;color:var(--accent);">${inc.id}</td>
+          <td class="mono" style="color:var(--text-secondary);">${inc.type}</td>
+          <td><span class="badge severity-${inc.severity}">${inc.severity}</span></td>
+          <td class="mono">${inc.target}</td>
+          <td><span class="badge status-${inc.status}">${inc.status}</span></td>
+          <td class="mono">${inc.attempt_count} / ${inc.max_attempts}</td>
+          <td class="mono" style="font-size:0.72rem;color:var(--text-secondary);">${formatTime(inc.created_at)}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ── B5. Simulator Button Handlers ──
+    function setControlsLoading(loading) {
+      isPipelineRunning = loading;
+      const buttons = [
+        document.getElementById('btn-run-demo'),
+        document.getElementById('btn-trigger-detect'),
+        document.getElementById('btn-manual-recover'),
+        document.getElementById('btn-open-inject-modal')
+      ];
+      buttons.forEach(b => {
+        if (b) {
+          b.disabled = loading;
+          b.classList.toggle('is-loading', loading);
+        }
+      });
+    }
+
+    // 1. Run Full Demo
+    document.getElementById('btn-run-demo').addEventListener('click', async () => {
+      setControlsLoading(true);
+      showToast('Running automated remediation demo...', 'info');
+      try {
+        const res = await fetchApi('/api/v1/demo/failure', { method: 'POST' });
+        showToast(`Demo completed: ${res.final_status.toUpperCase()}`, res.final_status === 'resolved' ? 'success' : 'warning');
+        if (res.incident_id) {
+          await selectIncident(res.incident_id);
+        }
+        await refreshAll();
+      } catch (err) {
+        showToast(`Demo execution failed: ${err.message}`, 'error');
+      } finally {
+        setControlsLoading(false);
+      }
+    });
+
+    // 2. Detect & Register Anomaly
+    document.getElementById('btn-trigger-detect').addEventListener('click', async () => {
+      setControlsLoading(true);
+      try {
+        const inc = await fetchApi('/api/v1/incidents', {
+          method: 'POST',
+          body: JSON.stringify({ auto_detect: true })
+        });
+        showToast(`Anomaly detected: Incident ${inc.id} registered`, 'success');
+        await selectIncident(inc.id);
+        await refreshAll();
+      } catch (err) {
+        showToast(`Detection check: ${err.message}`, 'info');
+      } finally {
+        setControlsLoading(false);
+      }
+    });
+
+    // 3. Manual Recovery
+    document.getElementById('btn-manual-recover').addEventListener('click', async () => {
+      setControlsLoading(true);
+      try {
+        await fetchApi('/api/v1/simulator/recover', { method: 'POST' });
+        showToast('Target payment-api restored to healthy status', 'success');
+        await loadHealthStatus();
+      } catch (err) {
+        showToast(`Recovery failed: ${err.message}`, 'error');
+      } finally {
+        setControlsLoading(false);
+      }
+    });
+
+    // 4. Inject Failure with Confirmation Modal
+    const modalInject = document.getElementById('modal-inject-confirm');
+    document.getElementById('btn-open-inject-modal').addEventListener('click', () => {
+      modalInject.classList.add('active');
+    });
+    document.getElementById('btn-cancel-inject').addEventListener('click', () => {
+      modalInject.classList.remove('active');
+    });
+    document.getElementById('btn-confirm-inject').addEventListener('click', async () => {
+      const selectedType = document.querySelector('input[name="failure_type"]:checked')?.value || 'unhealthy';
+      modalInject.classList.remove('active');
+      setControlsLoading(true);
+
+      let endpoint = '/api/v1/simulator/unhealthy';
+      let desc = 'HTTP 500 Unhealthy status';
+      if (selectedType === 'deployment-failed') {
+        endpoint = '/api/v1/simulator/deployment-failed';
+        desc = 'Bad Deployment v2.0.0 (HTTP 503 & rollback required)';
+      } else if (selectedType === 'latency') {
+        endpoint = '/api/v1/simulator/latency?delay=5.0';
+        desc = 'Latency Spike (5.0s probe timeout)';
+      }
+
+      try {
+        await fetchApi(endpoint, { method: 'POST' });
+        showToast(`Failure injected: ${desc}`, 'warning');
+        await loadHealthStatus();
+      } catch (err) {
+        showToast(`Injection failed: ${err.message}`, 'error');
+      } finally {
+        setControlsLoading(false);
+      }
+    });
+
+    // Manual Refresh Button
+    document.getElementById('btn-refresh').addEventListener('click', async function() {
+      this.classList.add('spinning');
+      await refreshAll();
+      this.classList.remove('spinning');
+      showToast('Dashboard data refreshed', 'info');
+    });
+
+    // Filter event listeners
+    document.getElementById('filter-severity').addEventListener('change', renderFilteredIncidents);
+    document.getElementById('filter-status').addEventListener('change', renderFilteredIncidents);
+
+    // ── Global Refresh Master ──
+    async function refreshAll() {
+      secondsSinceUpdate = 0;
+      document.getElementById('last-updated').textContent = 'Updated 0s ago';
+
+      await Promise.allSettled([
+        loadHealthStatus(),
+        loadIncidents(),
+        loadAuditTrail(),
+        loadMetrics()
+      ]);
+    }
+
+    // ── Helpers ──
+    function formatTime(isoStr) {
+      if (!isoStr) return '—';
+      try {
+        const d = new Date(isoStr);
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          + ' ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      } catch {
+        return isoStr;
+      }
+    }
+
+    function getOutcomeClass(outcome) {
+      if (!outcome) return 'neutral';
+      if (outcome.includes('SUCCEEDED')) return 'success';
+      if (outcome.includes('BLOCKED')) return 'blocked';
+      if (outcome.includes('FAILED') || outcome.includes('DENIED')) return 'failed';
+      return 'neutral';
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // ── Timers ──
+    // 1. Seconds counter for "Updated Xs ago"
+    setInterval(() => {
+      secondsSinceUpdate += 1;
+      document.getElementById('last-updated').textContent = `Updated ${secondsSinceUpdate}s ago`;
+    }, 1000);
+
+    // 2. Auto-refresh every 15 seconds
+    setInterval(() => {
+      if (!isPipelineRunning) {
+        refreshAll();
+      }
+    }, 15000);
+
+    // ── Initial Boot ──
+    window.addEventListener('DOMContentLoaded', () => {
+      refreshAll();
+      refreshIcons();
+    });
+  </script>
+</body>
+</html>

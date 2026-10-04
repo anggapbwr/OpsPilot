@@ -25,7 +25,8 @@ class Settings(BaseSettings):
     # Ollama AI Configuration
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
-    ollama_timeout_seconds: float = 10.0
+    ollama_timeout_seconds: float = 45.0
+    ollama_connect_timeout_seconds: float = 5.0
 
     # Target Monitored Service
     target_service_name: str = "payment-api"

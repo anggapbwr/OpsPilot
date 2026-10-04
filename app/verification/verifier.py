@@ -7,7 +7,7 @@ from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.detection.health_checker import HealthChecker
 from app.models.incident import Incident, IncidentState
-from app.models.remediation import VerificationStatus
+from app.models.remediation import RemediationStatus, VerificationStatus
 
 logger = get_logger("verification.verifier")
 
@@ -41,25 +41,42 @@ class Verifier:
         passed = check_result.get("healthy", False)
 
         # Update last attempt in history if available
-        if incident.remediation_history:
-            last_attempt = incident.remediation_history[-1]
+        last_attempt = incident.remediation_history[-1] if incident.remediation_history else None
+        if last_attempt:
             last_attempt.verification_status = (
                 VerificationStatus.passed if passed else VerificationStatus.failed
             )
 
+        remediation_succeeded = bool(last_attempt and last_attempt.status == RemediationStatus.success)
+
         if passed:
+            outcome = (
+                "REMEDIATION_SUCCEEDED_AND_VERIFIED"
+                if remediation_succeeded
+                else "REMEDIATION_FAILED_BUT_RECOVERED_INDEPENDENTLY"
+            )
             logger.info(
-                f"Verification PASSED for Incident {incident.id} (HTTP {check_result.get('status_code')})"
+                f"Verification PASSED for Incident {incident.id} (HTTP {check_result.get('status_code')}) - Outcome: {outcome}"
             )
             incident.transition_to(
                 IncidentState.resolved,
-                reason="Target service passed health verification checks",
+                reason=(
+                    "Target service passed health verification checks after successful remediation."
+                    if remediation_succeeded
+                    else "Target service recovered independently (prior remediation execution had failed)."
+                ),
             )
             return {
                 "passed": True,
                 "status_code": check_result.get("status_code"),
                 "latency_ms": check_result.get("latency_ms"),
-                "message": "Service successfully recovered and is healthy.",
+                "outcome": outcome,
+                "remediation_succeeded": remediation_succeeded,
+                "message": (
+                    "Service successfully recovered and is healthy."
+                    if remediation_succeeded
+                    else "Target service recovered independently despite remediation execution failure."
+                ),
             }
 
         # Verification failed
@@ -90,5 +107,7 @@ class Verifier:
             "passed": False,
             "status_code": check_result.get("status_code"),
             "latency_ms": check_result.get("latency_ms"),
+            "outcome": "VERIFICATION_FAILED",
+            "remediation_succeeded": remediation_succeeded,
             "error": check_result.get("error", "Verification failed"),
         }

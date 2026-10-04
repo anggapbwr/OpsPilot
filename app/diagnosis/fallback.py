@@ -46,13 +46,13 @@ class FallbackDiagnoser:
                 source=DiagnosisSource.fallback,
             )
 
-        if incident_type == IncidentType.failed_deployment:
+        if incident_type == IncidentType.failed_deployment or http_status == 503:
             return DiagnosisResult(
                 root_cause="deployment_initialization_error",
-                confidence=0.82,
+                confidence=0.85,
                 recommended_action="rollback_deployment",
                 reasoning_summary=(
-                    "Application deployment failed initial health checks; rollback to previous stable release required."
+                    "Application deployment failed initial health checks (503); rollback to previous stable release required."
                 ),
                 source=DiagnosisSource.fallback,
             )

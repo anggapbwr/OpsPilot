@@ -174,6 +174,53 @@ async def test_full_pipeline_repeated_failure_escalates(mock_pipeline_components
 
 
 @pytest.mark.asyncio
+async def test_full_pipeline_repeated_ansible_execution_failure_escalates(mock_pipeline_components):
+    """When Ansible execution itself repeatedly fails, pipeline bounded retry halts and escalates."""
+    comps = mock_pipeline_components
+    orchestrator: IncidentOrchestrator = comps["orchestrator"]
+    mock_ansible = comps["mock_ansible"]
+    mock_ollama = comps["mock_ollama"]
+
+    # Ansible execution fails on every attempt
+    mock_ansible.execute_action.return_value = {
+        "success": False,
+        "action": "restart_container",
+        "playbook": "restart_container.yml",
+        "returncode": 1,
+        "duration_seconds": 0.5,
+        "stdout": "",
+        "stderr": "docker restart payment-api failed: container not found",
+    }
+
+    mock_ollama.diagnose_incident.return_value = AIDiagnosisOutput(
+        root_cause="application_process_failure",
+        confidence=0.85,
+        recommended_action="restart_container",
+        reasoning_summary="Attempting restart.",
+    )
+
+    incident = Incident(
+        id="INC-EXEC-FAIL-1",
+        type=IncidentType.container_unhealthy,
+        severity=IncidentSeverity.medium,
+        target="payment-api",
+        status=IncidentState.detected,
+        max_attempts=3,
+    )
+
+    escalated = await orchestrator.run_pipeline(incident)
+
+    assert escalated.status == IncidentState.escalated
+    assert escalated.attempt_count == 3
+    assert len(escalated.remediation_history) == 3
+
+    audits = comps["audit_logger"].get_entries_for_incident(escalated.id)
+    assert len(audits) >= 1
+    assert audits[-1].final_status == "escalated"
+    assert audits[-1].outcome == "REMEDIATION_FAILED"
+
+
+@pytest.mark.asyncio
 async def test_full_pipeline_prohibited_action_is_blocked(mock_pipeline_components):
     """Scenario 3: AI recommends delete_resource -> Policy blocks it -> Blocked without Ansible execution."""
     comps = mock_pipeline_components
@@ -210,6 +257,15 @@ async def test_full_pipeline_prohibited_action_is_blocked(mock_pipeline_componen
     assert blocked.policy_decision.blocked is True
     assert blocked.policy_decision.allowed is False
     mock_ansible.execute_action.assert_not_called()
+
+    # Verify structured audit trail accurately records blocked outcome without execution
+    audits = comps["audit_logger"].get_entries_for_incident(blocked.id)
+    assert len(audits) >= 1
+    assert audits[-1].recommended_action == "delete_resource"
+    assert audits[-1].policy_decision == "blocked"
+    assert audits[-1].execution_status == "not_executed"
+    assert audits[-1].verification_status == "not_executed"
+    assert audits[-1].outcome == "BLOCKED_BY_POLICY"
 
 
 @pytest.mark.asyncio
@@ -279,3 +335,14 @@ def test_api_endpoints_integration():
     assert kpi_res.status_code == 200
     assert "kpis" in kpi_res.json()
     assert "mttr" in kpi_res.json()["formulas"]
+
+    # 4. Dashboard and audit endpoints
+    dash_res = client.get("/dashboard")
+    assert dash_res.status_code == 200
+    assert "OpsPilot" in dash_res.text
+    assert "text/html" in dash_res.headers.get("content-type", "")
+
+    audit_res = client.get("/api/v1/audit")
+    assert audit_res.status_code == 200
+    assert "entries" in audit_res.json()
+

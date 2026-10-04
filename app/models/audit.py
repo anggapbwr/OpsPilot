@@ -12,6 +12,7 @@ class AuditEntry(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     incident_id: str
     incident_type: str
+    severity: str = "medium"
     target: str
     diagnosis_source: str
     root_cause: str
@@ -23,4 +24,6 @@ class AuditEntry(BaseModel):
     verification_status: str
     attempt: int
     final_status: str
+    duration_seconds: Optional[float] = None
+    outcome: Optional[str] = None
     notes: Optional[str] = None

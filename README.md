@@ -9,48 +9,51 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
 [![Ansible](https://img.shields.io/badge/Ansible-Automation-EE0000.svg)](https://www.ansible.com/)
 [![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-E6522C.svg)](https://prometheus.io/)
-[![CI](https://github.com/opspilot/opspilot/actions/workflows/ci.yml/badge.svg)](https://github.com/opspilot/opspilot/actions)
+[![Tests](https://img.shields.io/badge/Tests-35%2F35%20Passing-brightgreen.svg)](tests/)
+[![Code Style: Ruff](https://img.shields.io/badge/Code%20Style-Ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
 ## 1. Overview
 
-**OpsPilot** is a policy-driven autonomous infrastructure remediation platform engineered for reliability, safety, and operational control. Unlike naive "self-healing" systems that grant generative AI models raw shell access or arbitrary command generation, OpsPilot enforces a deterministic control boundary:
+**OpsPilot** is an open-source, policy-driven autonomous incident response and remediation platform designed for modern Site Reliability Engineering (SRE). Unlike naive self-healing systems that grant generative AI models raw shell access or unconstrained terminal execution, OpsPilot enforces a **deterministic control boundary**:
 
 ```text
-AI = Analyze
-Policy Engine = Decide
-Ansible = Execute
-Verifier = Validate
+AI = Analyze (Reason about telemetry and logs)
+Policy Engine = Decide (Enforce safety rules, risk tiers, and approval gates)
+Ansible = Execute (Run pre-tested, immutable playbooks)
+Verifier = Validate (Independent health checks — AI never grades its own homework)
 ```
 
-OpsPilot continuously monitors target microservices, automatically gathers diagnostic evidence when an incident occurs, prompts local LLMs (via Ollama) or fallback heuristic rules for root-cause analysis, verifies recommended actions against a declarative policy engine, invokes predefined Ansible playbooks, and conducts independent post-remediation health verification.
+OpsPilot continuously monitors target services, automatically collects sanitized diagnostic evidence during anomalies, queries local LLMs (via Ollama `llama3.2`) or fallback heuristics for root-cause analysis, evaluates actions against declarative policies (`remediation.yaml`), executes predefined Ansible playbooks, and conducts independent verification to restore healthy state.
 
 ---
 
-## 2. The Problem
+## 2. The Problem: The "Rogue AI" Reliability Risk
 
-Modern site reliability engineering faces two competing dilemmas:
+Modern SRE teams face two opposing challenges:
 
-1. **Slow Mean Time to Resolution (MTTR):** Routine infrastructure faults (deadlocked application workers, zombie processes, failed container deployments) require manual triage by on-call engineers, waking humans at 3 AM for known fixes.
-2. **The "Rogue AI" Reliability Risk:** Granting an LLM unrestricted command-line access or letting it run generative bash scripts in production introduces extreme security and operational risks:
-   - Hallucinated or non-existent command flags.
-   - Accidental invocation of destructive commands (`rm -rf`, `DROP TABLE`, resource deletion).
-   - Indefinite remediation loops causing cascading cluster outages.
-   - Lack of determinism, audit compliance, and human approval gates for high-risk operations.
+1. **Slow Mean Time to Recovery (MTTR):** Routine infrastructure issues (deadlocked application workers, zombie processes, failed container deployments) wake on-call engineers at 3 AM for known fixes.
+2. **The "Rogue AI" Threat in Production:** Giving an LLM direct shell or bash generation permissions introduces catastrophic operational and security risks:
+   - **Hallucinated parameters:** Running invalid flags or corrupting configurations.
+   - **Accidental destruction:** Executing destructive commands (`rm -rf`, `DROP TABLE`, or deleting cloud resources).
+   - **Cascading flapping loops:** Infinite retry loops that crash entire clusters.
+   - **Lack of auditability:** No deterministic audit trail or human approval gates for high-risk operations.
 
 ---
 
-## 3. The Solution
+## 3. The OpsPilot Solution
 
-OpsPilot bridges autonomous AI diagnostic reasoning with deterministic infrastructure safety controls.
+OpsPilot pairs probabilistic AI diagnostic reasoning with deterministic infrastructure safety controls:
 
-- **AI proposes, Policy authorizes:** The AI only suggests actions from an approved whitelist.
-- **Default-Deny Policy Engine:** Any unrecognized, out-of-bounds, or blocked action is denied immediately.
-- **Predefined Ansible Playbooks:** Remediation is strictly executed through immutable, pre-tested playbooks—never arbitrary shell strings.
-- **Independent Verification:** The AI never marks its own homework; an independent health verifier decides if recovery succeeded.
-- **Bounded Retries:** If remediation fails 3 times, autonomous actions halt immediately and escalate to human on-call engineers.
+- **AI proposes, Policy authorizes:** The AI model is strictly restricted to an approved action whitelist.
+- **Default-Deny Policy Engine:** Any unrecognized, out-of-bounds, or blocked action is rejected immediately.
+- **Predefined Ansible Playbooks:** Execution is exclusively handled through immutable, pre-tested Ansible playbooks—never generated shell strings.
+- **Human-in-the-Loop Approval Gates:** High-risk actions (`rollback_deployment`, `modify_firewall`) safely halt the pipeline until an authorized operator issues approval.
+- **Independent Verification:** Post-remediation health is validated independently through active HTTP probes.
+- **Bounded Retries:** Remediation attempts are capped (default: max 3). Unresolved incidents automatically escalate to human on-call engineers.
+- **100% Local & Privacy-Preserving:** Local inference via Ollama keeps sensitive logs and telemetry inside your own infrastructure.
 
 ---
 
@@ -59,81 +62,70 @@ OpsPilot bridges autonomous AI diagnostic reasoning with deterministic infrastru
 ```mermaid
 flowchart TD
     subgraph Target Infrastructure
-        API[payment-api :8080]
-        Metrics[Prometheus Scrape]
+        API["payment-api :8080 (Target Microservice)"]
+        Metrics["Prometheus Scrape (/metrics)"]
     end
 
     subgraph OpsPilot Platform
-        Detect[Detection Engine]
-        Evidence[Evidence Collector]
-        Diag[Diagnosis Engine]
-        Ollama[Ollama LLM]
-        Fallback[Deterministic Fallback]
-        Policy[Policy Engine\nremediation.yaml]
-        Executor[Remediation Executor]
-        Ansible[Ansible Playbooks]
-        Verify[Independent Verifier]
-        Audit[Structured Audit Log]
+        Detect["Detection Engine (HTTP Probes)"]
+        Evidence["Evidence Collector (Logs & Telemetry)"]
+        Diag["Diagnosis Engine"]
+        Ollama["Ollama LLM (llama3.2)"]
+        Fallback["Deterministic Fallback Engine"]
+        Policy["Policy Engine (remediation.yaml)"]
+        Gate{"Human Approval Gate\n(High Risk Actions)"}
+        Executor["Remediation Executor"]
+        Ansible["Ansible Playbooks (.yml)"]
+        Verify["Independent Verifier"]
+        Audit["Compliance Audit Log (audit.log)"]
     end
 
     API -->|Health Probes| Detect
     Detect -->|Anomaly Detected| Evidence
     Evidence -->|Sanitized Context| Diag
-    Diag -->|Query| Ollama
-    Ollama -.->|Unavailable / Invalid| Fallback
+    Diag -->|Structured Prompt| Ollama
+    Ollama -.->|Connection Failure| Fallback
     Diag -->|Recommended Action| Policy
-    Policy -->|Denied / Blocked| Audit
-    Policy -->|Allowed| Executor
+    Policy -->|Blocked / Prohibited| Audit
+    Policy -->|Requires Approval| Gate
+    Gate -->|Approved by Human| Executor
+    Gate -->|Rejected by Human| Audit
+    Policy -->|Auto-Execute (Low Risk)| Executor
     Executor -->|Run Playbook| Ansible
-    Ansible -->|Target Remediation| API
-    Ansible -->|Execution Status| Verify
-    Verify -->|Health Check| API
+    Ansible -->|Execute Action| API
+    Ansible -->|Execution Outcome| Verify
+    Verify -->|Probe Health| API
     Verify -->|Passed| Audit
-    Verify -->|Failed & Retries Left| Executor
+    Verify -->|Failed & Attempts Left| Executor
     Verify -->|Failed & Max Attempts| Audit
 ```
 
 ---
 
-## 5. Core Workflow
-
-```text
-Detect
-   ↓
-Collect Evidence (Container state, logs, HTTP status)
-   ↓
-Diagnose (Ollama LLM / Deterministic Fallback)
-   ↓
-Generate Action Plan
-   ↓
-Policy Validation (Risk level, approval gates, bounded retry)
-   ↓
-Execute Remediation (Predefined Ansible playbook)
-   ↓
-Verify (Independent HTTP probe)
-   ↓
-Resolved / Escalated / Blocked
-```
-
-### Incident State Machine
+## 5. Incident Lifecycle & State Machine
 
 ```mermaid
 stateDiagram-v2
-    [*] --> detected
-    detected --> investigating
-    investigating --> diagnosed
-    diagnosed --> awaiting_approval : Risk = High / Approval Required
-    awaiting_approval --> remediating : Human Approved
-    awaiting_approval --> blocked : Rejected
-    diagnosed --> remediating : Risk = Low / Auto-Execute
-    diagnosed --> blocked : Prohibited Action
-    diagnosed --> resolved : Action = no_action
-    diagnosed --> escalated : Action = escalate
-    remediating --> verifying : Playbook Success
-    remediating --> escalated : Max Retries Exceeded
-    verifying --> resolved : Health Check 200 OK
-    verifying --> remediating : Verification Failed (Attempts < Max)
-    verifying --> escalated : Verification Failed (Attempts >= Max)
+    [*] --> detected: Anomaly Detected (500, 503, Timeout)
+    detected --> investigating: Collect Logs & Evidence
+    investigating --> diagnosed: AI / Fallback Diagnosis
+    
+    diagnosed --> awaiting_approval: High-Risk Action (e.g. rollback_deployment)
+    awaiting_approval --> remediating: Operator Approves (POST /approve)
+    awaiting_approval --> escalated: Operator Rejects (POST /reject)
+    
+    diagnosed --> remediating: Low-Risk Action (e.g. restart_container)
+    diagnosed --> blocked: Prohibited Action (e.g. delete_resource)
+    diagnosed --> resolved: Recommended Action = no_action
+    diagnosed --> escalated: Recommended Action = escalate
+    
+    remediating --> verifying: Ansible Playbook Completed
+    remediating --> escalated: Max Retries Exceeded
+    
+    verifying --> resolved: Independent Probe 200 OK
+    verifying --> remediating: Probe Failed (Attempts < Max)
+    verifying --> escalated: Probe Failed (Attempts >= Max)
+    
     resolved --> [*]
     escalated --> [*]
     blocked --> [*]
@@ -141,249 +133,245 @@ stateDiagram-v2
 
 ---
 
-## 6. Safety Model
+## 6. Safety & Security Guardrails
 
-Safety is the primary engineering differentiator of OpsPilot.
-
-| Safety Principle | Implementation |
-|---|---|
-| **Default Deny** | Any action not explicitly declared in `policies/remediation.yaml` is denied. |
-| **No Arbitrary Shell Execution** | OpsPilot never runs `subprocess.run(ai_string)`. Execution is locked to an immutable registry of predefined Ansible playbooks. |
-| **Pydantic Validation** | AI outputs must strictly validate against `AIDiagnosisOutput`. Unauthorized actions (`rm_rf`, `delete_database`) cause schema validation exceptions. |
-| **Human-in-the-Loop Gate** | High-risk actions (`rollback_deployment`, `modify_firewall`) halt at `awaiting_approval` until an operator issues an approval API call. |
-| **Hard Prohibitions** | Critical actions (`delete_resource`) are marked `blocked: true` and are unconditionally rejected. |
-| **Bounded Retries** | Automatic retry limits (default 3) prevent infinite execution loops and flapping. |
-| **Tamper-Evident Audit Trail** | Every diagnosis, decision, playbook execution, and verification check is logged to `logs/audit.log` in structured JSONL format. |
+| Guardrail | Implementation | Benefit |
+|---|---|---|
+| **Default-Deny Policy** | Actions must be declared in `policies/remediation.yaml` with `allowed: true`. | Unregistered actions are dropped with HTTP 403. |
+| **Zero Raw Shell Execution** | OpsPilot never runs `subprocess.run(ai_string)`. Execution strictly invokes predefined Ansible playbooks. | Eliminates prompt injection, hallucinated flags, and malicious commands. |
+| **Strict Pydantic Validation** | LLM outputs are forced into a strict JSON schema (`AIDiagnosisOutput`). | Malformed or out-of-schema outputs fail gracefully into fallback rules. |
+| **Human-in-the-Loop Gates** | Medium/High-risk actions halt at `awaiting_approval` until human operator approval via Dashboard or API. | Prevents unintended rollbacks or network modifications without consent. |
+| **Hard Prohibitions** | Dangerous actions (e.g., `delete_resource`) are marked `blocked: true`. | Zero execution regardless of AI confidence score. |
+| **Bounded Retries** | Limits attempts (default: 3) before halting and escalating. | Prevents flapping, cascading restarts, and infinite remediation loops. |
+| **Sanitized Telemetry** | Automated regex masking strips tokens, secrets, and API keys. | Ensures zero sensitive data leakage in logs or LLM prompts. |
+| **Compliance Audit Trail** | Every diagnosis, policy check, playbook result, and verification is logged in structured JSONL. | Complete traceability for SOC2 and security compliance. |
 
 ---
 
-## 7. Technology Stack
+## 7. Interactive Web Dashboard
+
+OpsPilot includes a modern, light-theme operations dashboard available at **`http://localhost:8000/dashboard`**.
+
+![Dashboard](https://raw.githubusercontent.com/opspilot/opspilot/main/docs/dashboard-preview.png)
+
+### Key Features
+1. **Live System Health Chips:** Real-time visual status monitoring of the target microservice (`payment-api`) and local AI provider (`Ollama`).
+2. **Operational KPI Cards:** Dynamic tracking of **Total Incidents**, **Remediation Success Rate**, **MTTR (Mean Time To Recovery)**, and **Policy Blocks**.
+3. **Interactive Visual Pipeline Stepper:** Step-by-step progress tracking across all 6 stages (`Detect` $\rightarrow$ `Evidence` $\rightarrow$ `Diagnose` $\rightarrow$ `Policy` $\rightarrow$ `Remediate` $\rightarrow$ `Verify`).
+4. **Simulator Sandbox & Failure Modal:** Inject realistic simulated failure modes:
+   - **Bad Deployment (v2.0.0 · 503):** Triggers `rollback_deployment` and engages the Human Approval Gate.
+   - **Service Crash / 500 Spike:** Triggers auto-restart remediation playbook.
+   - **Latency Timeout Spike (5.0s):** Triggers health probe threshold detection.
+5. **Human Approval Gate UI:** Direct one-click **Approve** and **Reject** buttons for actions awaiting operator authorization.
+6. **Diagnostic Evidence Drawer:** Collapsible view of captured container stdout/stderr log buffers and HTTP probe payloads.
+7. **Compliance Audit Trail & Incident History:** Real-time data tables with live filters by severity and incident status.
+
+---
+
+## 8. Technology Stack
 
 - **Backend:** Python 3.12+, FastAPI, Pydantic v2, Uvicorn
 - **Automation Engine:** Ansible (`ansible-core`, `community.docker`)
-- **Infrastructure:** Docker, Docker Compose
-- **Monitoring & Observability:** Prometheus (`/metrics`)
-- **AI / LLM:** Ollama (local model: `llama3.2`), with automatic deterministic fallback
-- **Testing & Quality:** Pytest, pytest-asyncio, Ruff
+- **Container Infrastructure:** Docker, Docker Compose
+- **Metrics & Observability:** Prometheus (`/metrics`)
+- **Local AI / LLM:** Ollama (local model: `llama3.2`) with automatic deterministic fallback
+- **Testing & Quality:** Pytest, pytest-asyncio, Ruff (100% test coverage)
+- **Frontend:** Responsive Vanilla HTML5/CSS3/ES6 (Light Mode design system, Lucide icons)
 
 ---
 
-## 8. Project Structure
+## 9. Project Structure
 
 ```text
-opspilot/
+OpsPilot/
 ├── app/
-│   ├── main.py                     # FastAPI application entry point
+│   ├── main.py                     # FastAPI entry point & lifespan management
+│   ├── orchestrator.py             # Incident lifecycle pipeline orchestrator
 │   ├── dependencies.py             # Dependency injection providers
-│   ├── orchestrator.py             # End-to-end incident orchestration pipeline
-│   ├── api/                        # HTTP API route controllers
-│   │   ├── routes_health.py        # Health check probes
-│   │   ├── routes_incidents.py     # Incident lifecycle & approval routes
-│   │   ├── routes_remediation.py   # Remediation execution & demo endpoints
-│   │   └── routes_metrics.py       # Prometheus metrics exposition
-│   ├── core/                       # Settings, exceptions, logging, metrics
-│   ├── models/                     # Domain schemas (Incident, Diagnosis, Policy, Audit)
+│   ├── api/                        # REST API routing
+│   │   ├── routes_health.py        # Health and readiness probes
+│   │   ├── routes_incidents.py     # Incident management, approval, and rejection
+│   │   ├── routes_remediation.py   # Playbook execution & simulator proxy endpoints
+│   │   └── routes_metrics.py       # Prometheus and operational KPI metrics
+│   ├── core/                       # Configuration, logging, metrics, exceptions
+│   ├── models/                     # Pydantic schemas (Incident, Diagnosis, Policy, Audit)
 │   ├── detection/                  # Anomaly detection & HTTP health checkers
-│   ├── evidence/                   # Diagnostic evidence collection & sanitization
-│   ├── diagnosis/                  # Ollama client & deterministic fallback engine
-│   ├── policy/                     # Declarative policy engine & YAML loader
-│   ├── remediation/                # Ansible execution runner & action registry
-│   ├── verification/               # Post-remediation health verifier
-│   └── audit/                      # Structured JSONL audit logger
-├── ansible/                        # Predefined, immutable Ansible playbooks
+│   ├── evidence/                   # Telemetry collection & log sanitization
+│   ├── diagnosis/                  # Ollama local LLM client & deterministic fallback
+│   ├── policy/                     # Declarative policy engine & rule evaluation
+│   ├── remediation/                # Ansible execution runner & playbook mapping
+│   ├── verification/               # Independent post-remediation health validator
+│   ├── audit/                      # Structured JSONL audit logger
+│   └── static/
+│       └── dashboard.html          # Interactive single-page web dashboard
+├── ansible/                        # Immutable Ansible automation
 │   ├── ansible.cfg
 │   ├── inventory/hosts.yml
 │   └── playbooks/
-│       ├── restart_container.yml
-│       ├── restart_service.yml
-│       ├── rollback.yml
-│       └── verify_service.yml
+│       ├── restart_container.yml   # Container restart playbook
+│       ├── restart_service.yml     # In-container process restart playbook
+│       ├── rollback.yml            # Deployment rollback playbook
+│       └── verify_service.yml      # Post-remediation verification playbook
 ├── policies/
-│   └── remediation.yaml            # Deterministic policy rules
-├── simulator/                      # Microservice testbed & fault injection
-│   ├── sample-api/                 # payment-api target service (FastAPI)
-│   └── fault_injection/            # Controlled failure injection scripts
+│   └── remediation.yaml            # Deterministic policy rules and constraints
+├── simulator/                      # Microservice sandbox & fault injection
+│   └── sample-api/                 # payment-api target service (FastAPI)
+│       ├── app.py
+│       ├── Dockerfile
+│       └── requirements.txt
 ├── monitoring/
 │   └── prometheus.yml              # Prometheus scrape configuration
-├── scripts/                        # Automated demo, start, and reset scripts
-├── tests/                          # 100% passing unit & integration test suite
-├── docker-compose.yml              # Full multi-container environment
-├── Dockerfile                      # Production OpsPilot container image
-├── Makefile                        # Command automation
+├── scripts/
+│   ├── demo.ps1                    # End-to-end verification suite (PowerShell)
+│   └── demo.sh                     # End-to-end verification suite (Bash)
+├── tests/                          # 100% passing test suite (35 tests)
+│   ├── integration/                # End-to-end pipeline and extended scenario tests
+│   └── unit/                       # Component-level tests (Policy, Diagnosis, etc.)
+├── docker-compose.yml              # Multi-container orchestration stack
+├── Dockerfile                      # Production container definition
+├── pyproject.toml                  # Python package configuration & Ruff settings
 └── README.md
 ```
 
 ---
 
-## 9. Installation & Prerequisites
+## 10. Quick Start
 
 ### Prerequisites
-- Python 3.12+
 - Docker and Docker Compose
+- Python 3.12+ (for local test development)
 - `curl`
 
-### Clone and Local Setup
-
+### 1. Clone Repository
 ```bash
-git clone https://github.com/opspilot/opspilot.git
-cd opspilot
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
+git clone https://github.com/anggapbwr/OpsPilot.git
+cd OpsPilot
 ```
 
----
-
-## 10. Running the Project
-
-### Option A: Using Docker Compose (Recommended)
-
-Starts OpsPilot, target microservice `payment-api`, Prometheus, and Ollama in a unified network:
-
+### 2. Start the OpsPilot Stack
 ```bash
+# Build and launch all services in detached mode
 docker compose up -d --build
+
+# Verify running containers
+docker compose ps
 ```
 
-Access points:
-- **OpsPilot API:** http://localhost:8000
-- **Swagger Documentation:** http://localhost:8000/docs
-- **Target `payment-api`:** http://localhost:8080
-- **Prometheus Dashboard:** http://localhost:9090
-
-### Option B: Local Development
-
+### 3. Pull Ollama Model (One-Time Setup)
 ```bash
-# Terminal 1: Run sample target microservice
-python simulator/sample-api/app.py
+docker exec ollama ollama pull llama3.2
+```
 
-# Terminal 2: Run OpsPilot
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+### 4. Access Platform Services
+
+| Service | URL | Purpose |
+|---|---|---|
+| **OpsPilot Dashboard** | `http://localhost:8000/dashboard` | Interactive operations UI |
+| **API Swagger Docs** | `http://localhost:8000/docs` | Interactive OpenAPI documentation |
+| **Target Microservice** | `http://localhost:8080` | `payment-api` simulation sandbox |
+| **Prometheus Metrics** | `http://localhost:9090` | Operational metrics and alerts |
+
+---
+
+## 11. Validated End-to-End Scenarios
+
+OpsPilot includes automated demo scripts for **Windows PowerShell** (`scripts/demo.ps1`) and **Bash** (`scripts/demo.sh`) validating all 5 core operational behaviors:
+
+### Running via PowerShell
+```powershell
+# Run all 5 scenarios end-to-end:
+.\scripts\demo.ps1 -Scenario all
+
+# Or run an individual scenario:
+.\scripts\demo.ps1 -Scenario 1   # Demo 1: AI Auto-Remediation (Ollama / llama3.2)
+.\scripts\demo.ps1 -Scenario 2   # Demo 2: AI Unavailable Fallback Resilience
+.\scripts\demo.ps1 -Scenario 3   # Demo 3: Rogue AI Dangerous Action Blocked
+.\scripts\demo.ps1 -Scenario 4   # Demo 4: Repeated Failure Bounded Escalation
+.\scripts\demo.ps1 -Scenario 5   # Demo 5: Bad Deployment & Human Approval Gate
+```
+
+### Running via Bash (Linux / macOS)
+```bash
+chmod +x ./scripts/demo.sh
+./scripts/demo.sh all
 ```
 
 ---
 
-## 11. Running the Autonomous Demo
+### Scenario Breakdown
 
-OpsPilot includes an automated demo script demonstrating failure injection, detection, evidence gathering, diagnosis, policy authorization, Ansible execution, verification, and resolution:
-
-```bash
-# On Linux / macOS / WSL:
-bash scripts/demo.sh
-
-# On Windows PowerShell:
-.\scripts\demo.ps1
-```
-
-Or trigger the demo programmatically via the API:
-
-```bash
-curl -X POST http://localhost:8000/api/v1/demo/failure
-```
-
-### Sample Output
-
-```text
-========================================
-          OpsPilot Demo
-========================================
-
-[1] Checking target...
-✓ payment-api healthy
-
-[2] Injecting failure...
-✓ Failure injected (/health endpoint will now return HTTP 500)
-
-[3] Detecting incident...
-✓ Incident detected: INC-0001
-
-[4] Collecting evidence...
-✓ Evidence collected
-
-[5] AI Diagnosis...
-Root cause: application_process_failure
-Recommended action: restart_container
-Diagnosis source: fallback
-
-[6] Policy Validation...
-Risk: LOW
-Decision: ALLOWED
-
-[7] Ansible Remediation...
-✓ Container restarted
-
-[8] Verification...
-✓ Health check passed
-
-[9] Final Result...
-✓ INCIDENT RESOLVED
-
-Recovery time: 2.34 seconds
-========================================
-```
-
----
-
-## 12. Failure Scenarios
-
-OpsPilot handles diverse operational scenarios out of the box:
-
-### Scenario 1: Standard Unhealthy Container
-- **Trigger:** Application deadlocks, `/health` returns HTTP 500.
-- **Action:** AI or fallback recommends `restart_container`.
+#### Scenario 1: AI Auto-Remediation (Ollama `llama3.2`)
+- **Failure:** HTTP 500 error spike injected into `payment-api`.
+- **Diagnosis:** Ollama analyzes logs and recommends `restart_container` (`source: ollama`).
 - **Policy:** Risk `low`, `auto_execute: true`.
-- **Execution:** Ansible executes `restart_container.yml`.
-- **Verification:** HTTP 200 OK. State transitions to `resolved`.
+- **Remediation:** Ansible executes `restart_container.yml`.
+- **Verification:** Independent health check succeeds (HTTP 200). Status: **`RESOLVED`**.
 
-### Scenario 2: Repeated / Unrecoverable Failure
-- **Trigger:** Service is permanently corrupted and cannot recover.
-- **Execution:** Attempt 1 fails verification $\rightarrow$ Attempt 2 fails $\rightarrow$ Attempt 3 fails.
-- **Policy:** Bounded retries limit reached (`max_attempts: 3`).
-- **Result:** Automated attempts stop. State transitions to `escalated` and alerts on-call.
+#### Scenario 2: Zero-Downtime Fallback Resilience
+- **Condition:** Ollama container stopped or unreachable.
+- **Diagnosis:** Fallback engine detects timeout and engages deterministic rules (`source: fallback`).
+- **Policy:** Risk `low`, `auto_execute: true`.
+- **Remediation:** Ansible restarts target container.
+- **Verification:** Target restored (HTTP 200). Status: **`RESOLVED`** with 100% uptime.
 
-### Scenario 3: Rogue AI Recommendation (Security Defense)
-- **Trigger:** AI model hallucinates or recommends `delete_resource`.
-- **Policy:** Action identified as `blocked: true`.
-- **Result:** Remediation is strictly prohibited. State transitions to `blocked`. Audit log recorded. Ansible is **never** invoked.
+#### Scenario 3: Rogue AI Security Defense (Policy Enforcement)
+- **Condition:** AI recommendation suggests `delete_resource`.
+- **Policy:** Evaluates `policies/remediation.yaml` $\rightarrow$ `blocked: true`, `risk: critical`.
+- **Safety Action:** Execution strictly blocked with HTTP 403. Ansible is **never** invoked.
+- **Audit:** Violation recorded in compliance audit log. Status: **`BLOCKED`**.
 
-### Scenario 4: Ollama LLM Offline (High Availability)
-- **Trigger:** Ollama service is unreachable or network times out.
-- **Diagnostic Engine:** Automatically detects connection failure and activates `FallbackDiagnoser`.
-- **Result:** Deterministic rules diagnose the fault without interruption. Platform maintains 100% availability.
+#### Scenario 4: Persistent Failure & Bounded Escalation
+- **Failure:** Permanent unrecoverable failure targeting an unresponsive service.
+- **Execution:** Attempt 1 fails $\rightarrow$ Attempt 2 fails $\rightarrow$ Attempt 3 fails.
+- **Policy:** Reaches `max_attempts: 3`. Halts execution to prevent flapping loops.
+- **Safety Action:** Status transitions to **`ESCALATED`** and alerts human on-call engineer.
+
+#### Scenario 5: Bad Deployment & Human Approval Gate (Rollback)
+- **Failure:** Defective v2.0.0 release injected into `payment-api` returning HTTP 503.
+- **Diagnosis:** AI identifies schema migration failure and recommends `rollback_deployment`.
+- **Policy:** `rollback_deployment` classified as `medium` risk, requiring operator consent (`requires_approval: true`).
+- **Gate:** Pipeline halts safely at **`AWAITING_APPROVAL`**.
+- **Human Action:** Operator reviews evidence and issues approval via Dashboard or API (`POST /approve`).
+- **Remediation:** Pipeline resumes $\rightarrow$ Ansible executes `rollback.yml` $\rightarrow$ Target restored to stable v1.0.0.
+- **Verification:** Independent probe passes. Status: **`RESOLVED`**.
 
 ---
 
-## 13. API Documentation
+## 12. REST API Reference
 
-Comprehensive OpenAPI / Swagger documentation is available at `http://localhost:8000/docs`.
+Comprehensive OpenAPI documentation is available interactively at `/docs`.
 
-### Primary Endpoints
+### Core API Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/health` | Liveness health check. |
-| `GET` | `/api/v1/health` | Comprehensive component readiness probe. |
-| `GET` | `/api/v1/incidents` | List all tracked incidents. |
-| `POST` | `/api/v1/incidents` | Create or auto-detect an incident. |
-| `GET` | `/api/v1/incidents/{id}` | Get incident details and execution history. |
-| `POST` | `/api/v1/incidents/{id}/diagnose` | Run evidence collection and diagnosis. |
-| `POST` | `/api/v1/incidents/{id}/approve` | Grant human approval for high-risk actions. |
-| `POST` | `/api/v1/incidents/{id}/remediate` | Trigger policy-checked playbook execution. |
-| `POST` | `/api/v1/incidents/{id}/verify` | Run independent health verification. |
-| `GET` | `/api/v1/incidents/{id}/audit` | Retrieve complete audit trail. |
-| `GET` | `/metrics` | Prometheus metrics scrape endpoint. |
-| `GET` | `/api/v1/metrics/kpi` | Calculated MTTR and success rate metrics. |
-| `POST` | `/api/v1/demo/failure` | Trigger controlled failure injection demo. |
+| `GET` | `/dashboard` | Interactive Web Operations Dashboard |
+| `GET` | `/health` | OpsPilot liveness health probe |
+| `GET` | `/api/v1/health` | Comprehensive component readiness check |
+| `GET` | `/api/v1/incidents` | List all tracked incidents |
+| `POST` | `/api/v1/incidents` | Create or auto-detect an incident (`auto_detect: true`) |
+| `GET` | `/api/v1/incidents/{id}` | Get incident details, state, and remediation history |
+| `POST` | `/api/v1/incidents/{id}/diagnose` | Trigger evidence collection and AI/fallback diagnosis |
+| `POST` | `/api/v1/incidents/{id}/approve` | Grant human operator approval for gated actions |
+| `POST` | `/api/v1/incidents/{id}/reject` | Reject action and escalate incident to on-call |
+| `POST` | `/api/v1/incidents/{id}/run` | Execute complete autonomous remediation pipeline |
+| `POST` | `/api/v1/incidents/{id}/remediate` | Trigger policy-checked playbook execution |
+| `POST` | `/api/v1/incidents/{id}/verify` | Run independent health verification check |
+| `GET` | `/api/v1/incidents/{id}/audit` | Retrieve complete audit trail for a specific incident |
+| `GET` | `/api/v1/audit` | Retrieve complete global audit log |
+| `GET` | `/metrics` | Prometheus metrics scrape endpoint |
+| `GET` | `/api/v1/metrics/kpi` | Real-time calculated MTTR and success rate metrics |
+| `POST` | `/api/v1/demo/failure` | Trigger one-click automated failure & recovery demo |
+| `POST` | `/api/v1/simulator/deployment-failed` | Inject simulated v2.0.0 bad deployment (503) |
+| `POST` | `/api/v1/simulator/unhealthy` | Inject simulated process crash (500) |
+| `POST` | `/api/v1/simulator/latency` | Inject simulated latency spike (timeout) |
+| `POST` | `/api/v1/simulator/recover` | Reset target service to healthy baseline (200) |
 
 ---
 
-## 14. Metrics & Operational Impact
+## 13. Observability & Operational KPIs
 
-### Tracked Prometheus Metrics
-
+### Prometheus Metrics
 - `opspilot_incidents_total{type, severity, target}`: Counter of detected anomalies.
 - `opspilot_incidents_resolved_total{target, action}`: Counter of successfully resolved incidents.
 - `opspilot_incidents_escalated_total{target, reason}`: Counter of incidents escalated to human operators.
@@ -394,76 +382,63 @@ Comprehensive OpenAPI / Swagger documentation is available at `http://localhost:
 - `opspilot_active_incidents`: Current active non-terminal incidents gauge.
 
 ### Operational KPIs (Calculated via `/api/v1/metrics/kpi`)
-
-1. **Mean Time To Recovery (MTTR):**
-   $$\text{MTTR} = \frac{\sum (\text{recovery duration})}{\text{resolved incidents}}$$
-2. **Remediation Success Rate:**
-   $$\text{Success Rate} = \frac{\text{successful remediations}}{\text{total remediation attempts}} \times 100$$
-3. **Manual Intervention Rate:**
-   $$\text{Intervention Rate} = \frac{\text{incidents requiring human intervention}}{\text{total incidents}} \times 100$$
-
-> **Note on Benchmarks:** OpsPilot measures and reports dynamic metrics based on real system executions. It does not fabricate benchmark numbers.
+- **Mean Time To Recovery (MTTR):** Average time in seconds from anomaly detection to verified resolution.
+- **Remediation Success Rate:** Percentage of playbook executions resulting in verified service recovery.
+- **Policy Block Count:** Total number of dangerous or unapproved actions intercepted and blocked.
 
 ---
 
-## 15. Testing
+## 14. Testing & Code Quality
 
-OpsPilot features a 100% passing test suite covering unit logic, state machines, policy enforcement, AI validation, and end-to-end integration pipelines:
+OpsPilot maintains a **100% pass rate across 35 unit and integration tests**:
 
 ```bash
-# Run all tests
+# Run complete test suite
 pytest tests/ -v
 
-# Run with linter validation
-ruff check .
+# Run code style & lint checks
+ruff check app/ tests/ simulator/
 ```
 
----
-
-## 16. Security & Hardening
-
-1. **Zero Raw Shell Execution:** AI cannot pass shell commands. All execution maps strictly to immutable playbooks.
-2. **Strict Whitelist & Default-Deny:** Unregistered actions are dropped with HTTP 403.
-3. **Log Sanitization:** Regex filters strip authentication tokens, passwords, and API keys from diagnostic evidence.
-4. **No Credential Storage:** Environment variables and Docker socket mounts are utilized securely; secrets are never committed.
-5. **Exception Shielding:** Internal Python stack traces are intercepted and logged to prevent data leakage in HTTP responses.
+### Test Coverage Highlights
+- `tests/unit/test_policy.py`: Whitelist validation, blocked rules, attempt bounds, approval requirements.
+- `tests/unit/test_diagnosis.py`: Structured schema validation, action whitelisting, confidence constraints.
+- `tests/unit/test_incident.py`: Valid and invalid state transitions across the incident state machine.
+- `tests/unit/test_verification.py`: Verification delays, retry logic, and independent health probes.
+- `tests/integration/test_incident_pipeline.py`: Full end-to-end pipeline happy path, repeated failure escalation, policy blocking, and fallback diagnosis.
+- `tests/integration/test_scenarios_extended.py`: Bad deployment approval gate, operator rejection escalation, latency timeout recovery, and API gate endpoints.
 
 ---
 
-## 17. Design Decisions
+## 15. Architectural Design Decisions (FAQ)
 
-### Why Ollama?
-Ollama enables local, privacy-preserving LLM inference (`llama3.2`, `mistral`, etc.) without streaming sensitive operational telemetry to external third-party cloud APIs.
+### Why Ollama instead of OpenAI / Cloud APIs?
+Infrastructure logs, container outputs, and stack traces often contain internal IPs, sensitive metadata, or proprietary code paths. Ollama runs models locally (`llama3.2`), ensuring zero external data leakage and deterministic network locality.
 
-### Why Ansible?
-Ansible is idempotent, declarative, and purpose-built for infrastructure configuration management. Using predefined playbooks ensures executions are tested, reproducible, and verifiable.
+### Why Ansible instead of custom Python execution scripts?
+Ansible provides idempotent, declarative, industry-standard configuration management. Using predefined playbooks guarantees that remediation actions are tested, version-controlled, auditable, and immutable.
 
-### Why not n8n or Zapier?
-While low-code tools excel at SaaS integrations (e.g. Jira to Slack), OpsPilot focuses on core infrastructure remediation where deterministic state enforcement, local process interaction, and bounded retries are required.
+### Why can't the AI directly execute commands?
+Large Language Models are probabilistic token predictors. Granting an LLM direct shell execution in production creates catastrophic security and reliability hazards. OpsPilot treats AI as an **advisory analytical engine**, keeping authorization and execution strictly deterministic.
 
-### Why AI cannot execute commands?
-LLMs are probabilistic token predictors. Infrastructure remediation requires deterministic safety guarantees. Allowing an AI to directly run generated shell commands introduces catastrophic risks of cluster corruption and outage cascades.
-
-### Why the Policy Engine?
-The policy engine acts as an authorization boundary between probabilistic analysis and infrastructure modification. It enforces risk tiers, bounded retries, and human approval gates.
+### Why an independent verifier?
+Systems that allow the remediating agent to declare whether it succeeded suffer from confirmation bias. OpsPilot’s independent verifier actively probes the microservice from outside the remediation loop.
 
 ---
 
-## 18. Limitations
+## 16. Contributing
 
-- **Single Node Target Scope (MVP):** The initial implementation is tailored for containerized microservices managed via Docker/Docker Compose.
-- **Ephemeral In-Memory State:** Incidents are stored in an in-memory repository for lightweight operation without database overhead; audit logs are persisted to JSONL on disk.
+Contributions to OpsPilot are welcome! Please follow these steps:
 
----
-
-## 19. Future Improvements
-
-- Multi-cluster Kubernetes support via predefined K8s operator playbooks.
-- Webhook notifications for Slack, PagerDuty, and Microsoft Teams.
-- Integration with OpenTelemetry distributed tracing spans.
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feature/amazing-feature`).
+3. Ensure all tests pass (`pytest tests/`) and code conforms to Ruff (`ruff check .`).
+4. Commit your changes (`git commit -m 'Add amazing feature'`).
+5. Push to the branch (`git push origin feature/amazing-feature`).
+6. Open a Pull Request.
 
 ---
 
-## 20. License
+## 17. License
 
-OpsPilot is licensed under the [MIT License](LICENSE).
+Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information.

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 class DiagnosisSource(str, Enum):
     """Source of the incident diagnosis."""
 
+    ollama = "ollama"
     ai = "ai"
     fallback = "fallback"
 
@@ -22,6 +23,8 @@ ALLOWED_ACTIONS = {
     "rollback_deployment",
     "no_action",
     "escalate",
+    "modify_firewall",
+    "delete_resource",
 }
 
 AllowedActionType = Literal[
@@ -30,6 +33,8 @@ AllowedActionType = Literal[
     "rollback_deployment",
     "no_action",
     "escalate",
+    "modify_firewall",
+    "delete_resource",
 ]
 
 
